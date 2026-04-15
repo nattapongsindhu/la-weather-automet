@@ -1,6 +1,6 @@
 # 🚀 Go Auto Engine
 
-<p align="center">
+<p align="left">
   <img src="https://img.shields.io/badge/Status-Running-green"/>
   <img src="https://img.shields.io/badge/Automation-GitHub_Actions-blue"/>
   <img src="https://img.shields.io/badge/Cost-100%25_Free-orange"/>
