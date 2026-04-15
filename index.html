@@ -8,9 +8,31 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg:       #0b1a2a;
+      --card-bg:  #0f2840;
+      --border:   #1e3a5f;
+      --text:     #e0f0ff;
+      --muted:    #7ab;
+      --accent:   #00ffcc;
+      --grid:     #1e3a5f;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg:      #f0f4f8;
+        --card-bg: #ffffff;
+        --border:  #c8d8e8;
+        --text:    #1a2a3a;
+        --muted:   #5580a0;
+        --accent:  #007a66;
+        --grid:    #d0dde8;
+      }
+    }
+
     body {
-      background: #0b1a2a;
-      color: #e0f0ff;
+      background: var(--bg);
+      color: var(--text);
       font-family: 'Segoe UI', Arial, sans-serif;
       min-height: 100vh;
       display: flex;
@@ -20,24 +42,24 @@
       transition: opacity 0.3s;
     }
 
-    body.loading { opacity: 0.6; }
+    body.loading { opacity: 0.6; pointer-events: none; }
 
     h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
-    .subtitle { color: #7ab; font-size: 0.9rem; margin-bottom: 2rem; }
+    .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
 
     .cards {
       display: flex;
       flex-wrap: wrap;
       gap: 1rem;
       justify-content: center;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
       width: 100%;
       max-width: 700px;
     }
 
     .card {
-      background: #0f2840;
-      border: 1px solid #1e3a5f;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
       border-radius: 10px;
       padding: 1rem 1.5rem;
       min-width: 130px;
@@ -45,48 +67,73 @@
       text-align: center;
     }
 
-    .card .label { font-size: 0.75rem; color: #7ab; text-transform: uppercase; letter-spacing: 1px; }
-    .card .value { font-size: 1.6rem; font-weight: bold; margin-top: 0.25rem; color: #00ffcc; }
-    .card .unit  { font-size: 0.75rem; color: #7ab; }
+    .card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .card .value { font-size: 1.6rem; font-weight: bold; margin-top: 0.25rem; color: var(--accent); }
+    .card .unit  { font-size: 0.75rem; color: var(--muted); }
 
     .status-OK   { color: #00ffcc; }
     .status-WARM { color: #ffcc00; }
     .status-HOT  { color: #ff4444; }
     .status-COLD { color: #44aaff; }
 
+    /* time filter */
+    .filter-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .filter-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      padding: 0.3rem 0.8rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-btn.active,
+    .filter-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0b1a2a;
+      font-weight: bold;
+    }
+
     .chart-wrap {
       width: 100%;
       max-width: 700px;
-      background: #0f2840;
-      border: 1px solid #1e3a5f;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
       border-radius: 10px;
       padding: 1rem;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
       position: relative;
+    }
+
+    .chart-wrap canvas {
+      max-height: 280px;
     }
 
     .chart-empty {
       text-align: center;
-      color: #456;
+      color: var(--muted);
       padding: 2rem;
       font-size: 0.85rem;
       display: none;
     }
 
     .health {
-      font-size: 0.7rem;
-      color: #456;
-      margin-top: 0.25rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
     }
-
     .health.ok   { color: #00cc88; }
     .health.warn { color: #ffaa00; }
 
-    .updated {
-      font-size: 0.75rem;
-      color: #7ab;
-      margin-top: 0.5rem;
-    }
+    .updated { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
 
     #error-msg {
       color: #f66;
@@ -96,12 +143,23 @@
       max-width: 500px;
       text-align: center;
     }
+
+    .anomaly-badge {
+      display: none;
+      background: #ff4444;
+      color: white;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
 
-<!-- v4 -->
-<h1>🚀 LA Weather Automet</h1>
+<!-- v5 -->
+<h1>🚀 LA Weather Automet <span class="anomaly-badge" id="anomaly-badge">⚠ ANOMALY</span></h1>
 <p class="subtitle">Fetch → Analyze → Score → Visualize</p>
 
 <div class="cards">
@@ -127,9 +185,15 @@
   </div>
 </div>
 
+<div class="filter-bar">
+  <button class="filter-btn active" data-range="24">24h</button>
+  <button class="filter-btn" data-range="168">7d</button>
+  <button class="filter-btn" data-range="all">All</button>
+</div>
+
 <div class="chart-wrap">
   <canvas id="chart"></canvas>
-  <div class="chart-empty" id="chart-empty">No data available</div>
+  <div class="chart-empty" id="chart-empty">No data available for this range</div>
 </div>
 
 <p class="updated" id="updated-at"></p>
@@ -138,6 +202,9 @@
 
 <script>
 let chartInstance = null;
+let allRows       = [];
+let activeRange   = 24;
+
 const ALLOWED_STATUS = ["OK", "WARM", "HOT", "COLD"];
 
 function setError(msg) {
@@ -145,21 +212,79 @@ function setError(msg) {
   el.textContent = "⚠️ " + msg;
   el.style.display = "block";
 }
-
 function clearError() {
   document.getElementById("error-msg").style.display = "none";
 }
 
+function renderChart(range) {
+  const now = Date.now();
+  let filtered = allRows;
+
+  if (range !== "all") {
+    const cutoff = now - range * 60 * 60 * 1000;
+    filtered = allRows.filter(r => r.ts >= cutoff);
+  }
+
+  const emptyEl = document.getElementById("chart-empty");
+  if (!filtered.length) {
+    emptyEl.style.display = "block";
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    return;
+  }
+  emptyEl.style.display = "none";
+
+  const labels = filtered.map(r =>
+    new Date(r.ts).toLocaleTimeString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+  );
+  const values = filtered.map(r => r.temp);
+
+  if (chartInstance) chartInstance.destroy();
+
+  chartInstance = new Chart(document.getElementById("chart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Temperature (°C)",
+        data: values,
+        borderColor: "#00ffcc",
+        backgroundColor: "rgba(0,255,204,0.08)",
+        tension: 0.4,
+        pointRadius: filtered.length > 50 ? 0 : 3,
+        fill: true,
+        spanGaps: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: "#aac" } } },
+      scales: {
+        x: { ticks: { color: "#7ab", maxRotation: 45, maxTicksLimit: 10 }, grid: { color: "#1e3a5f" } },
+        y: { ticks: { color: "#7ab" }, grid: { color: "#1e3a5f" } }
+      }
+    }
+  });
+}
+
+// filter button events
+document.querySelectorAll(".filter-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeRange = btn.dataset.range === "all" ? "all" : parseInt(btn.dataset.range);
+    renderChart(activeRange);
+  });
+});
+
 async function load() {
   document.body.classList.add("loading");
-
   try {
-    // --- data.json with cache bypass ---
+    // data.json
     const res = await fetch("./data.json", { cache: "no-store" });
     if (!res.ok) throw new Error("data.json fetch failed: " + res.status);
     const d = await res.json();
 
-    // schema validation
     if (typeof d.temp !== "number") throw new Error("Invalid data: temp missing");
     if (typeof d.wind !== "number") throw new Error("Invalid data: wind missing");
 
@@ -168,89 +293,47 @@ async function load() {
     document.getElementById("val-trend").textContent = d.trend ?? "";
     document.getElementById("val-score").textContent = d.score ?? "—";
 
-    // safe status class
-    const status  = ALLOWED_STATUS.includes(d.status) ? d.status : "OK";
+    const status   = ALLOWED_STATUS.includes(d.status) ? d.status : "OK";
     const statusEl = document.getElementById("val-status");
     statusEl.textContent = d.status ?? "—";
     statusEl.className   = "value status-" + status;
 
-    // pipeline health check
+    // anomaly badge
+    const badge = document.getElementById("anomaly-badge");
+    badge.style.display = d.anomaly === "ANOMALY" ? "inline" : "none";
+
+    // pipeline health
     if (d.updated) {
-      const updated   = new Date(d.updated);
-      const ageHours  = (Date.now() - updated.getTime()) / 3600000;
-      const healthEl  = document.getElementById("pipeline-health");
-      const updatedEl = document.getElementById("updated-at");
-
-      updatedEl.textContent = "Last updated: " + updated.toLocaleString();
-
+      const updated  = new Date(d.updated);
+      const ageHours = (Date.now() - updated.getTime()) / 3600000;
+      const healthEl = document.getElementById("pipeline-health");
+      document.getElementById("updated-at").textContent =
+        "Last updated: " + updated.toLocaleString();
       if (ageHours < 7) {
-        healthEl.textContent  = "● Pipeline healthy";
-        healthEl.className    = "health ok";
+        healthEl.textContent = "● Pipeline healthy";
+        healthEl.className   = "health ok";
       } else {
-        healthEl.textContent  = "⚠ Pipeline may be stale (" + Math.round(ageHours) + "h ago)";
-        healthEl.className    = "health warn";
+        healthEl.textContent = "⚠ Pipeline stale (" + Math.round(ageHours) + "h ago)";
+        healthEl.className   = "health warn";
       }
     }
 
-    // --- temp.csv with cache bypass ---
+    // temp.csv
     const csvRes = await fetch("./temp.csv", { cache: "no-store" });
     if (!csvRes.ok) throw new Error("temp.csv fetch failed: " + csvRes.status);
     const text = await csvRes.text();
 
-    const rows   = text.trim().split("\n").slice(1); // skip header
-    const last20 = rows.slice(-20);
-
-    const labels = last20.map(r => {
-      const ts = r.split(",")[0];
-      try { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
-      catch { return ts; }
-    });
-
-    // fix: filter nulls + validate parts
-    const values = last20.map(r => {
-      const parts = r.split(",");
-      if (parts.length < 2) return null;
-      const v = parseFloat(parts[1]);
-      return isNaN(v) ? null : v;
-    }).filter(v => v !== null);
-
-    // fix: guard against empty dataset
-    const emptyEl = document.getElementById("chart-empty");
-    if (!values.length) {
-      emptyEl.style.display = "block";
-      console.warn("No valid data for chart");
-      document.body.classList.remove("loading");
-      return;
+    allRows = [];
+    const lines = text.trim().split("\n").slice(1);
+    for (const line of lines) {
+      const parts = line.split(",");
+      if (parts.length < 2) continue;
+      const ts   = new Date(parts[0]).getTime();
+      const temp = parseFloat(parts[1]);
+      if (!isNaN(ts) && !isNaN(temp)) allRows.push({ ts, temp });
     }
-    emptyEl.style.display = "none";
 
-    if (chartInstance) chartInstance.destroy();
-
-    chartInstance = new Chart(document.getElementById("chart"), {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: "Temperature (°C)",
-          data: values,
-          borderColor: "#00ffcc",
-          backgroundColor: "rgba(0,255,204,0.1)",
-          tension: 0.4,
-          pointRadius: 3,
-          fill: true,
-          spanGaps: true
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { labels: { color: "#aac" } } },
-        scales: {
-          x: { ticks: { color: "#7ab", maxRotation: 45 }, grid: { color: "#1e3a5f" } },
-          y: { ticks: { color: "#7ab" },                  grid: { color: "#1e3a5f" } }
-        }
-      }
-    });
-
+    renderChart(activeRange);
     clearError();
 
   } catch (err) {
@@ -264,6 +347,5 @@ async function load() {
 load();
 setInterval(load, 10 * 60 * 1000);
 </script>
-
 </body>
 </html>
