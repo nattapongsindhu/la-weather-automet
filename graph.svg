@@ -1,4 +1,6 @@
 <svg width='400' height='100'>
-<circle cx='0' cy='100' r='2' fill='cyan' />
-<circle cx='10' cy='100' r='2' fill='cyan' />
+<circle cx='0' cy='80' r='2' fill='cyan' />
+<circle cx='10' cy='78' r='2' fill='cyan' />
+<circle cx='20' cy='75' r='2' fill='cyan' />
+<circle cx='30' cy='76' r='2' fill='cyan' />
 </svg>
