@@ -1,9 +1,13 @@
-# 🚀 SAFE AI DASHBOARD
+# 🚀 Go Auto Engine
 
-## 🌡 Data
-- Temp: 14 °C
-- Wind: 5 km/h
+## Live Data
+- Temp: auto
+- Wind: auto
 
-## 🤖 Status
-- HEALTHY
-- Updated: Wed Apr 15 06:00:25 UTC 2026
+## System
+- Analyze
+- Predict
+- Score
+
+## Graph
+![graph](graph.svg)
