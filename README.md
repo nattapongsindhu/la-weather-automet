@@ -1,16 +1,16 @@
-# 🚀 Go Auto Engine AI System
-
-## 🌡️ Live Data
+# 🚀 AI Engine Level 6
+## 🌡️ Data
 - Temp: 14.2 °C
 - Wind: 5.2 km/h
-
-## 🤖 AI Decision
+## 🤖 Decision
 - State: HEALTHY
 - Reason: Normal
-
 ## 📈 Prediction
 - Trend: STABLE
-
+## ⚠️ Anomaly
+- Anomaly: NO
+## 🧮 Score
+- System Score: 100 / 100
 ## 📊 Graph
 ```
 
@@ -20,12 +20,8 @@
 #
 ##############
 ```
-
-## 🧠 System Architecture
-Analyze → Decide → Predict → Update
-
+## 🧠 Flow
+Analyze → Decide → Predict → Detect → Score → Update
 ## 📜 History
 🟢 🟢 🔴 🟢
 14.2
-
-_Auto updated by AI agents_
