@@ -22,6 +22,8 @@ A zero-cost CI/CD automation pipeline that fetches real weather data for Los Ang
 
 <img src="./graph.svg" width="500"/>
 
+> SVG updates every 6h via pipeline. For interactive chart with full history → [Live Dashboard](https://nattapongsindhu.github.io/la-weather-automet/)
+
 ---
 
 ## ⚙️ How It Works
@@ -48,7 +50,7 @@ GitHub Actions (cron: every 6h)
 | `temp.csv` | Historical temperature log |
 | `graph.svg` | Auto-generated SVG chart (last 20 readings) |
 | `index.html` | Live dashboard (Chart.js) |
-| `history.txt` | Status history emoji heatmap |
+| `history.txt` | Structured audit log (timestamp, temp, wind, status, trend, score) |
 | `weather.json` | Raw API response |
 
 ---
