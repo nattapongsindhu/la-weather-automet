@@ -1,69 +1,223 @@
-name: go-auto-engine-safe
+name: ai-engine-safe-level6
 
 on:
   schedule:
-    - cron: "0 */6 * * *"   # ทุก 6 ชั่วโมง (วันละ 4 ครั้ง)
+    - cron: "0 */6 * * *"   # every 6 hours (safe)
   workflow_dispatch:
 
 concurrency:
-  group: safe-engine
+  group: ai-safe-engine
   cancel-in-progress: true
 
 permissions:
   contents: write
 
 jobs:
-  engine:
+
+  analyze:
     runs-on: ubuntu-latest
+    outputs:
+      temp: ${{ steps.data.outputs.temp }}
+      wind: ${{ steps.data.outputs.wind }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install tools
+      - name: Install jq
         run: sudo apt-get install -y jq
 
-      - name: Fetch weather
+      - name: Fetch weather data
+        id: data
         run: |
           curl -s "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
 
           TEMP=$(jq '.current_weather.temperature | floor' weather.json)
           WIND=$(jq '.current_weather.windspeed | floor' weather.json)
 
-          echo "TEMP=$TEMP" >> $GITHUB_ENV
-          echo "WIND=$WIND" >> $GITHUB_ENV
+          echo "temp=$TEMP" >> $GITHUB_OUTPUT
+          echo "wind=$WIND" >> $GITHUB_OUTPUT
 
-      - name: Decision
+  decide:
+    runs-on: ubuntu-latest
+    needs: analyze
+    outputs:
+      status: ${{ steps.decision.outputs.status }}
+      reason: ${{ steps.decision.outputs.reason }}
+
+    steps:
+      - name: Decision logic
+        id: decision
         run: |
-          if [ "$TEMP" -gt 30 ]; then
+          TEMP=${{ needs.analyze.outputs.temp }}
+
+          if [ "$TEMP" -gt 35 ]; then
+            STATUS="DANGER"
+            REASON="Extreme heat detected"
+          elif [ "$TEMP" -gt 30 ]; then
             STATUS="WARNING"
-          elif [ "$TEMP" -lt 10 ]; then
+            REASON="High temperature"
+          elif [ "$TEMP" -lt 5 ]; then
             STATUS="CRITICAL"
+            REASON="Low temperature"
           else
             STATUS="HEALTHY"
+            REASON="Normal condition"
           fi
 
-          echo "STATUS=$STATUS" >> $GITHUB_ENV
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
 
-      - name: Update README
+  predict:
+    runs-on: ubuntu-latest
+    needs: analyze
+    outputs:
+      trend: ${{ steps.pred.outputs.trend }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Predict trend
+        id: pred
         run: |
-          echo "# 🚀 SAFE AI DASHBOARD" > README.md
+          TEMP=${{ needs.analyze.outputs.temp }}
+
+          if [ ! -f history.txt ]; then
+            echo "$TEMP" > history.txt
+            TREND="NEW"
+          else
+            LAST=$(tail -n 1 history.txt)
+
+            if [ "$TEMP" -gt "$LAST" ]; then
+              TREND="UP"
+            elif [ "$TEMP" -lt "$LAST" ]; then
+              TREND="DOWN"
+            else
+              TREND="STABLE"
+            fi
+
+            echo "$TEMP" >> history.txt
+          fi
+
+          echo "trend=$TREND" >> $GITHUB_OUTPUT
+
+  anomaly:
+    runs-on: ubuntu-latest
+    needs: analyze
+    outputs:
+      anomaly: ${{ steps.check.outputs.anomaly }}
+
+    steps:
+      - name: Detect anomaly
+        id: check
+        run: |
+          TEMP=${{ needs.analyze.outputs.temp }}
+
+          if [ "$TEMP" -gt 45 ] || [ "$TEMP" -lt -5 ]; then
+            ANOMALY="YES"
+          else
+            ANOMALY="NO"
+          fi
+
+          echo "anomaly=$ANOMALY" >> $GITHUB_OUTPUT
+
+  score:
+    runs-on: ubuntu-latest
+    needs: [decide, anomaly]
+    outputs:
+      score: ${{ steps.calc.outputs.score }}
+
+    steps:
+      - name: Calculate score
+        id: calc
+        run: |
+          STATUS=${{ needs.decide.outputs.status }}
+          ANOMALY=${{ needs.anomaly.outputs.anomaly }}
+
+          SCORE=100
+
+          if [ "$STATUS" = "WARNING" ]; then SCORE=70; fi
+          if [ "$STATUS" = "CRITICAL" ]; then SCORE=40; fi
+          if [ "$STATUS" = "DANGER" ]; then SCORE=10; fi
+          if [ "$ANOMALY" = "YES" ]; then SCORE=0; fi
+
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+
+  update:
+    runs-on: ubuntu-latest
+    needs: [analyze, decide, predict, anomaly, score]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate graph
+        run: |
+          GRAPH=""
+          if [ -f history.txt ]; then
+            for T in $(tail -n 10 history.txt); do
+              BAR=$(printf "%0.s#" $(seq 1 $T))
+              GRAPH="$GRAPH\n$BAR"
+            done
+          fi
+
+          echo "GRAPH<<EOF" >> $GITHUB_ENV
+          echo -e "$GRAPH" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Generate README
+        run: |
+          TEMP=${{ needs.analyze.outputs.temp }}
+          WIND=${{ needs.analyze.outputs.wind }}
+          STATUS=${{ needs.decide.outputs.status }}
+          REASON=${{ needs.decide.outputs.reason }}
+          TREND=${{ needs.predict.outputs.trend }}
+          ANOMALY=${{ needs.anomaly.outputs.anomaly }}
+          SCORE=${{ needs.score.outputs.score }}
+
+          echo "# 🚀 AI Monitoring System (Safe Mode)" > README.md
           echo "" >> README.md
+
           echo "## 🌡 Data" >> README.md
-          echo "- Temp: $TEMP °C" >> README.md
-          echo "- Wind: $WIND km/h" >> README.md
+          echo "- Temperature: $TEMP °C" >> README.md
+          echo "- Wind Speed: $WIND km/h" >> README.md
           echo "" >> README.md
-          echo "## 🤖 Status" >> README.md
-          echo "- $STATUS" >> README.md
-          echo "- Updated: $(date)" >> README.md
 
-      - name: Commit (SAFE)
+          echo "## 🤖 System Status" >> README.md
+          echo "- Status: $STATUS" >> README.md
+          echo "- Reason: $REASON" >> README.md
+          echo "" >> README.md
+
+          echo "## 📈 Prediction" >> README.md
+          echo "- Trend: $TREND" >> README.md
+          echo "" >> README.md
+
+          echo "## ⚠️ Anomaly Detection" >> README.md
+          echo "- Anomaly: $ANOMALY" >> README.md
+          echo "" >> README.md
+
+          echo "## 🧮 Score" >> README.md
+          echo "- System Score: $SCORE / 100" >> README.md
+          echo "" >> README.md
+
+          echo "## 📊 Graph" >> README.md
+          echo '```' >> README.md
+          echo -e "$GRAPH" >> README.md
+          echo '```' >> README.md
+          echo "" >> README.md
+
+          echo "## 🔄 Flow" >> README.md
+          echo "Analyze → Decide → Predict → Detect → Score → Update" >> README.md
+          echo "" >> README.md
+
+          echo "## 📜 History" >> README.md
+          tail -n 5 history.txt >> README.md || echo "No history yet" >> README.md
+
+      - name: Commit changes (safe)
         run: |
-          git config user.name "safe-bot"
-          git config user.email "safe@bot.com"
+          git config user.name "safe-ai-bot"
+          git config user.email "bot@safe.ai"
 
-          git add README.md
+          git add .
 
-          # commit เฉพาะมีการเปลี่ยน
-          git diff --cached --quiet || git commit -m "safe update"
+          git diff --cached --quiet || git commit -m "safe AI update"
 
           git push
