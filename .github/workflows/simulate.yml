@@ -15,11 +15,19 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Fetch weather
+      - name: Fetch weather (with retry)
         run: |
-          curl -sf "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
+          for i in 1 2 3; do
+            curl -sf "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
+            if [ -s weather.json ]; then
+              echo "Fetch OK on attempt $i"
+              break
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 3
+          done
           if [ ! -s weather.json ]; then
-            echo "ERROR: weather fetch failed" && exit 1
+            echo "ERROR: all fetch attempts failed" && exit 1
           fi
 
       - name: Parse data
@@ -33,21 +41,20 @@ jobs:
             echo "ERROR: failed to parse weather data" && exit 1
           fi
 
-          echo "TEMP=$TEMP"         >> $GITHUB_ENV
-          echo "WIND=$WIND"         >> $GITHUB_ENV
+          echo "TEMP=$TEMP"           >> $GITHUB_ENV
+          echo "WIND=$WIND"           >> $GITHUB_ENV
           echo "DIRECTION=$DIRECTION" >> $GITHUB_ENV
-          echo "IS_DAY=$IS_DAY"     >> $GITHUB_ENV
+          echo "IS_DAY=$IS_DAY"       >> $GITHUB_ENV
 
-      - name: AI logic
+      - name: Analyze
         run: |
           python3 - <<'EOF'
-          import os, math
+          import os
 
           temp  = float(os.environ["TEMP"])
           wind  = float(os.environ["WIND"])
-          is_day = os.environ["IS_DAY"]
 
-          # Status
+          # Status classification
           if temp > 30:
               status = "HOT"
           elif temp > 20:
@@ -57,13 +64,15 @@ jobs:
           else:
               status = "OK"
 
-          # Trend — compare last recorded temp
+          # Trend vs previous reading
           trend = "Stable"
           try:
               with open("temp.csv") as f:
                   lines = [l for l in f.read().strip().splitlines() if "," in l]
-              if len(lines) >= 2:
-                  last_temp = float(lines[-1].split(",")[1])
+              # skip header, get last data row
+              data_lines = [l for l in lines if not l.startswith("timestamp")]
+              if data_lines:
+                  last_temp = float(data_lines[-1].split(",")[1])
                   diff = temp - last_temp
                   if diff > 1.5:
                       trend = "Rising"
@@ -72,32 +81,55 @@ jobs:
           except Exception:
               pass
 
-          # Heat index score (0–100)
+          # Anomaly detection: compare vs 7-day average
+          anomaly = ""
+          try:
+              with open("temp.csv") as f:
+                  lines = [l for l in f.read().strip().splitlines() if "," in l]
+              data_lines = [l for l in lines if not l.startswith("timestamp")]
+              recent = []
+              for l in data_lines[-28:]:  # last 28 readings = ~7 days
+                  try:
+                      recent.append(float(l.split(",")[1]))
+                  except Exception:
+                      pass
+              if len(recent) >= 5:
+                  avg = sum(recent) / len(recent)
+                  sd  = (sum((x - avg)**2 for x in recent) / len(recent)) ** 0.5
+                  if abs(temp - avg) > 2 * sd:
+                      anomaly = "ANOMALY"
+          except Exception:
+              pass
+
+          # Heat index score (0-100)
           score = min(100, max(0, int(temp * 2 + wind * 0.5)))
 
-          # Write env
           with open(os.environ["GITHUB_ENV"], "a") as f:
               f.write(f"STATUS={status}\n")
               f.write(f"TREND={trend}\n")
               f.write(f"SCORE={score}\n")
-
+              f.write(f"ANOMALY={anomaly}\n")
           EOF
 
       - name: Update files
         run: |
           TIMESTAMP=$(date -u "+%Y-%m-%dT%H:%M")
 
-          # --- temp.csv ---
-          # Create with header if missing
-          if [ ! -f temp.csv ]; then
+          # --- temp.csv: create header if missing, append, trim to 200 rows ---
+          if [ ! -f temp.csv ] || ! head -1 temp.csv | grep -q "timestamp"; then
             echo "timestamp,temperature,wind" > temp.csv
           fi
-          # Only append data rows (skip header re-write)
           echo "$TIMESTAMP,$TEMP,$WIND" >> temp.csv
 
-          # --- graph.svg (last 20 points) ---
+          # trim: keep header + last 200 data rows
+          HEAD=$(head -1 temp.csv)
+          TAIL=$(tail -n +2 temp.csv | tail -200)
+          { echo "$HEAD"; echo "$TAIL"; } > temp_new.csv
+          mv temp_new.csv temp.csv
+
+          # --- graph.svg ---
           python3 - <<'EOF'
-          import csv
+          import csv, datetime
 
           rows = []
           try:
@@ -125,46 +157,52 @@ jobs:
               y = h - pad - (val - min_t) / span * (h - 2*pad)
               return f"{x:.1f},{y:.1f}"
 
-          points = " ".join(px(i, v) for i, v in enumerate(rows))
-
-          import datetime
+          points  = " ".join(px(i, v) for i, v in enumerate(rows))
           updated = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-          svg = f"""<svg width="500" height="215" viewBox="0 0 500 215" xmlns="http://www.w3.org/2000/svg">
-            <rect width="500" height="215" fill="#0b1a2a"/>
-            <polyline fill="none" stroke="#00ffcc" stroke-width="2"
-              points="{points}"/>
-            <text x="10" y="15" font-size="10" fill="#aaa">Temp (°C) — last {len(rows)} readings</text>
-            <text x="10" y="210" font-size="9" fill="#556">Last updated: {updated}</text>
-          </svg>"""
+          svg = (
+              '<svg width="500" height="215" viewBox="0 0 500 215" xmlns="http://www.w3.org/2000/svg">'
+              '<rect width="500" height="215" fill="#0b1a2a"/>'
+              f'<polyline fill="none" stroke="#00ffcc" stroke-width="2" points="{points}"/>'
+              f'<text x="10" y="15" font-size="10" fill="#aaa">Temp (°C) — last {len(rows)} readings</text>'
+              f'<text x="10" y="210" font-size="9" fill="#556">Last updated: {updated}</text>'
+              '</svg>'
+          )
 
           with open("graph.svg", "w") as f:
               f.write(svg)
           EOF
 
-          # --- data.json ---
-          python3 -c "
-          import json
+          # --- data.json with checksum ---
+          python3 - <<'EOF'
+          import json, hashlib, os
+
           d = {
-            'temp': float('$TEMP'),
-            'wind': float('$WIND'),
-            'direction': float('$DIRECTION'),
-            'is_day': $IS_DAY == 1,
-            'status': '$STATUS',
-            'trend': '$TREND',
-            'score': $SCORE,
-            'updated': '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
+            "temp":      float(os.environ["TEMP"]),
+            "wind":      float(os.environ["WIND"]),
+            "direction": float(os.environ["DIRECTION"]),
+            "is_day":    os.environ["IS_DAY"] == "1",
+            "status":    os.environ["STATUS"],
+            "trend":     os.environ["TREND"],
+            "score":     int(os.environ["SCORE"]),
+            "anomaly":   os.environ.get("ANOMALY", ""),
+            "updated":   os.popen("date -u +%Y-%m-%dT%H:%M:%SZ").read().strip()
           }
-          print(json.dumps(d, indent=2))
-          " > data.json
 
-          # --- history.txt (structured audit log, keep last 100 entries) ---
-          if [ ! -f history.txt ] || ! grep -q "^timestamp" history.txt 2>/dev/null; then
-            echo "timestamp,temp,wind,status,trend,score" > history.txt
+          payload   = json.dumps(d, sort_keys=True)
+          d["sha256"] = hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+          with open("data.json", "w") as f:
+              json.dump(d, f, indent=2)
+          print("data.json written:", d)
+          EOF
+
+          # --- history.txt ---
+          if [ ! -f history.txt ] || ! head -1 history.txt | grep -q "^timestamp"; then
+            echo "timestamp,temp,wind,status,trend,score,anomaly" > history.txt
           fi
-          echo "$TIMESTAMP,$TEMP,$WIND,$STATUS,$TREND,$SCORE" >> history.txt
+          echo "$TIMESTAMP,$TEMP,$WIND,$STATUS,$TREND,$SCORE,$ANOMALY" >> history.txt
 
-          # Keep header + last 100 data rows
           HEAD=$(head -1 history.txt)
           TAIL=$(tail -n +2 history.txt | tail -100)
           { echo "$HEAD"; echo "$TAIL"; } > history_new.txt
@@ -177,5 +215,8 @@ jobs:
 
           git add temp.csv graph.svg data.json history.txt weather.json
           git diff --cached --quiet && echo "no change, skipping" && exit 0
-          git commit -m "data: ${TEMP}°C wind ${WIND}km/h [${STATUS}]"
+
+          LABEL="${STATUS}"
+          [ -n "$ANOMALY" ] && LABEL="${STATUS}+ANOMALY"
+          git commit -m "data: ${TEMP}°C wind ${WIND}km/h [${LABEL}]"
           git push
