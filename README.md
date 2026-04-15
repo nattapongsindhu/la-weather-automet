@@ -87,4 +87,3 @@ This project demonstrates:
 
 - GitHub Actions
 - Open-Meteo API
-- Your brain 🧠🔥
