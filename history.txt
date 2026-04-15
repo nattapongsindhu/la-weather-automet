@@ -1,2 +1,2 @@
-12.9 🟢
-12.9
+timestamp,temp,wind,status,trend,score
+2026-04-15T08:13,12.9,7.3,OK,Stable,29
