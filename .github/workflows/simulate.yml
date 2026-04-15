@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v5
 
       - name: Fetch weather (with retry)
         run: |
@@ -93,10 +93,10 @@ jobs:
                       recent.append(float(l.split(",")[1]))
                   except Exception:
                       pass
-              if len(recent) >= 5:
+              if len(recent) >= 10:
                   avg = sum(recent) / len(recent)
                   sd  = (sum((x - avg)**2 for x in recent) / len(recent)) ** 0.5
-                  if abs(temp - avg) > 2 * sd:
+                  if sd > 0.5 and abs(temp - avg) > 2 * sd:
                       anomaly = "ANOMALY"
           except Exception:
               pass
