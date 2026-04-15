@@ -1,16 +1,126 @@
-- name: Generate graph
-  run: |
-    echo "<svg width='500' height='200' xmlns='http://www.w3.org/2000/svg'>" > graph.svg
+name: go-auto-engine
 
-    X=20
-    POINTS=""
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
 
-    while read VALUE; do
-      Y=$((200 - VALUE * 3))
-      POINTS="$POINTS $X,$Y"
-      X=$((X+20))
-    done < temp.csv
+permissions:
+  contents: write
 
-    echo "<polyline points='$POINTS' fill='none' stroke='blue' stroke-width='2'/>" >> graph.svg
+jobs:
+  engine:
+    runs-on: ubuntu-latest
 
-    echo "</svg>" >> graph.svg
+    steps:
+
+    # 1. Checkout repo
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    # 2. Fetch weather (ฟรี)
+    - name: Fetch weather
+      run: |
+        curl -s "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
+
+    # 3. Parse JSON
+    - name: Parse weather
+      run: |
+        TEMP=$(jq '.current_weather.temperature | floor' weather.json)
+        WIND=$(jq '.current_weather.windspeed | floor' weather.json)
+
+        echo "TEMP=$TEMP" >> $GITHUB_ENV
+        echo "WIND=$WIND" >> $GITHUB_ENV
+
+    # 4. AI Decision (ไม่มี bc แล้ว)
+    - name: AI Decision
+      run: |
+        if [ "$TEMP" -gt 30 ]; then
+          STATUS="WARNING"
+          STATE="🟡"
+          COLOR="yellow"
+          REASON="High temperature may reduce performance"
+        elif [ "$TEMP" -lt 10 ]; then
+          STATUS="CRITICAL"
+          STATE="🔴"
+          COLOR="red"
+          REASON="Low temperature may affect stability"
+        else
+          STATUS="HEALTHY"
+          STATE="🟢"
+          COLOR="brightgreen"
+          REASON="System operating normally"
+        fi
+
+        echo "STATUS=$STATUS" >> $GITHUB_ENV
+        echo "STATE=$STATE" >> $GITHUB_ENV
+        echo "COLOR=$COLOR" >> $GITHUB_ENV
+        echo "REASON=$REASON" >> $GITHUB_ENV
+
+    # 5. Save temperature history
+    - name: Save history
+      run: |
+        if [ -f temp.csv ]; then
+          echo "$TEMP" >> temp.csv
+        else
+          echo "$TEMP" > temp.csv
+        fi
+
+        # keep last 20 points
+        tail -n 20 temp.csv > temp_trim.csv
+        mv temp_trim.csv temp.csv
+
+    # 6. Generate REAL graph (no bc, smooth line)
+    - name: Generate graph
+      run: |
+        echo "<svg width='500' height='200' xmlns='http://www.w3.org/2000/svg'>" > graph.svg
+
+        X=20
+        POINTS=""
+
+        while read VALUE; do
+          Y=$((200 - VALUE * 3))
+          POINTS="$POINTS $X,$Y"
+          X=$((X+20))
+        done < temp.csv
+
+        echo "<polyline points='$POINTS' fill='none' stroke='blue' stroke-width='2'/>" >> graph.svg
+
+        echo "</svg>" >> graph.svg
+
+    # 7. Generate README Dashboard
+    - name: Generate README
+      run: |
+        echo "# 🚀 Go Auto Engine Dashboard" > README.md
+        echo "" >> README.md
+
+        echo "![Status](https://img.shields.io/badge/status-$STATUS-$COLOR)" >> README.md
+        echo "![Auto](https://img.shields.io/badge/automation-active-blue)" >> README.md
+        echo "" >> README.md
+
+        echo "## 🌐 Live Data" >> README.md
+        echo "- 🌡 Temperature: ${TEMP}°C" >> README.md
+        echo "- 💨 Wind: ${WIND} km/h" >> README.md
+        echo "" >> README.md
+
+        echo "## 📈 Temperature Graph" >> README.md
+        echo "![graph](graph.svg)" >> README.md
+        echo "" >> README.md
+
+        echo "## 🧠 AI Analysis" >> README.md
+        echo "- Status: $STATE $STATUS" >> README.md
+        echo "- Insight: $REASON" >> README.md
+        echo "- Updated: $(date)" >> README.md
+        echo "" >> README.md
+
+        echo "---" >> README.md
+        echo "⚡ Powered by GitHub Actions + Open-Meteo API" >> README.md
+
+    # 8. Commit & push
+    - name: Commit & push
+      run: |
+        git config user.name "auto-engine-bot"
+        git config user.email "bot@auto-engine.com"
+        git add README.md temp.csv graph.svg
+        git commit -m "📈 level 3 graph stable update" || echo "no changes"
+        git push
