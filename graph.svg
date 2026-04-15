@@ -1,4 +1,6 @@
-<svg width='500' height='200' xmlns='http://www.w3.org/2000/svg'>
-<polyline fill='none' stroke='#00ffcc' stroke-width='2' points='
-40,200 80,133 120,134 '/>
+<svg width="500" height="200" viewBox="0 0 500 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="500" height="200" fill="#0b1a2a"/>
+  <polyline fill="none" stroke="#00ffcc" stroke-width="2"
+    points="20.0,148.0 480.0,180.0"/>
+  <text x="10" y="15" font-size="10" fill="#aaa">Temp (°C) — last 2 readings</text>
 </svg>
