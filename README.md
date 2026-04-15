@@ -1,11 +1,11 @@
-# 🚀 Go Auto Engine
+# 🚀 LA Weather Automet
 
 <p align="left">
   <img src="https://img.shields.io/badge/Status-Running-green"/>
   <img src="https://img.shields.io/badge/Automation-GitHub_Actions-blue"/>
   <img src="https://img.shields.io/badge/Cost-100%25_Free-orange"/>
-  <img src="https://img.shields.io/github/last-commit/nattapongsindhu/go-auto-engine"/>
-  <img src="https://img.shields.io/github/actions/workflow/status/nattapongsindhu/go-auto-engine/simulate.yml?label=pipeline"/>
+  <img src="https://img.shields.io/github/last-commit/nattapongsindhu/la-weather-automet"/>
+  <img src="https://img.shields.io/github/actions/workflow/status/nattapongsindhu/la-weather-automet/simulate.yml?label=pipeline"/>
 </p>
 
 A zero-cost CI/CD automation pipeline that fetches real weather data for Los Angeles every 6 hours, runs analysis logic, generates a live SVG chart, and publishes results to a GitHub Pages dashboard — fully automated with no servers, no secrets, and no spend.
@@ -14,7 +14,7 @@ A zero-cost CI/CD automation pipeline that fetches real weather data for Los Ang
 
 ## 🌐 Live Dashboard
 
-👉 **[nattapongsindhu.github.io/go-auto-engine](https://nattapongsindhu.github.io/go-auto-engine/)**
+👉 **[nattapongsindhu.github.io/la-weather-automet](https://nattapongsindhu.github.io/la-weather-automet/)**
 
 ---
 

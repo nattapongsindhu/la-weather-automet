@@ -1,4 +1,4 @@
-name: Go Auto Engine
+name: LA Weather Automet
 
 on:
   workflow_dispatch:
