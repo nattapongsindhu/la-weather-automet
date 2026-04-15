@@ -89,3 +89,4 @@ Score = `min(100, temp × 2 + wind × 0.5)`
 ---
 
 <p align="center">⚡ Built for Portfolio + Automation Engineering</p>
+ 
