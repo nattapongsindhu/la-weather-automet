@@ -127,11 +127,15 @@ jobs:
 
           points = " ".join(px(i, v) for i, v in enumerate(rows))
 
-          svg = f"""<svg width="500" height="200" viewBox="0 0 500 200" xmlns="http://www.w3.org/2000/svg">
-            <rect width="500" height="200" fill="#0b1a2a"/>
+          import datetime
+          updated = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+
+          svg = f"""<svg width="500" height="215" viewBox="0 0 500 215" xmlns="http://www.w3.org/2000/svg">
+            <rect width="500" height="215" fill="#0b1a2a"/>
             <polyline fill="none" stroke="#00ffcc" stroke-width="2"
               points="{points}"/>
             <text x="10" y="15" font-size="10" fill="#aaa">Temp (°C) — last {len(rows)} readings</text>
+            <text x="10" y="210" font-size="9" fill="#556">Last updated: {updated}</text>
           </svg>"""
 
           with open("graph.svg", "w") as f:
@@ -154,14 +158,16 @@ jobs:
           print(json.dumps(d, indent=2))
           " > data.json
 
-          # --- history.txt (last 28 status dots for README heatmap) ---
-          DOT="🟢"
-          [ "$STATUS" = "HOT" ] && DOT="🔴"
-          [ "$STATUS" = "COLD" ] && DOT="🔵"
+          # --- history.txt (structured audit log, keep last 100 entries) ---
+          if [ ! -f history.txt ] || ! grep -q "^timestamp" history.txt 2>/dev/null; then
+            echo "timestamp,temp,wind,status,trend,score" > history.txt
+          fi
+          echo "$TIMESTAMP,$TEMP,$WIND,$STATUS,$TREND,$SCORE" >> history.txt
 
-          PREV=$(tail -1 history.txt 2>/dev/null || true)
-          echo "$PREV $DOT" | tr -s ' ' | cut -c1-112 > history_new.txt
-          echo "$TEMP" >> history_new.txt
+          # Keep header + last 100 data rows
+          HEAD=$(head -1 history.txt)
+          TAIL=$(tail -n +2 history.txt | tail -100)
+          { echo "$HEAD"; echo "$TAIL"; } > history_new.txt
           mv history_new.txt history.txt
 
       - name: Commit
