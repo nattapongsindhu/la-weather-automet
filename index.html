@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Dashboard</title>
+  <title>AI Engine Dashboard</title>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -14,12 +14,27 @@
       padding: 40px;
     }
 
+    h1 {
+      color: #38bdf8;
+    }
+
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
     .card {
       background: #1e293b;
       padding: 20px;
-      margin: 10px auto;
+      margin: 10px;
       border-radius: 12px;
-      width: 400px;
+      width: 300px;
+    }
+
+    .big {
+      font-size: 28px;
+      margin: 10px 0;
     }
 
     .healthy { color: #22c55e; }
@@ -27,6 +42,7 @@
     .danger { color: #ef4444; }
 
     canvas {
+      max-width: 700px;
       margin-top: 20px;
     }
   </style>
@@ -36,59 +52,87 @@
 
 <h1>🚀 AI Monitoring Dashboard</h1>
 
-<div class="card" id="data">Loading...</div>
+<div class="container">
 
-<div class="card">
-  <canvas id="chart"></canvas>
+  <div class="card">
+    <h3>🌡 Temperature</h3>
+    <div class="big" id="temp">--</div>
+  </div>
+
+  <div class="card">
+    <h3>💨 Wind</h3>
+    <div class="big" id="wind">--</div>
+  </div>
+
+  <div class="card">
+    <h3>🤖 Status</h3>
+    <div class="big" id="status">--</div>
+  </div>
+
+  <div class="card">
+    <h3>📈 Trend</h3>
+    <div class="big" id="trend">--</div>
+  </div>
+
+  <div class="card">
+    <h3>🧮 Score</h3>
+    <div class="big" id="score">--</div>
+  </div>
+
 </div>
+
+<canvas id="chart"></canvas>
 
 <script>
 
 let chart;
+let history = [];
 
 async function loadData() {
+
   const res = await fetch('./data.json');
   const d = await res.json();
+
+  // UI update
+  document.getElementById('temp').innerText = d.temp + "°C";
+  document.getElementById('wind').innerText = d.wind + " km/h";
 
   let statusClass = "healthy";
   if (d.status === "WARNING") statusClass = "warning";
   if (d.status === "CRITICAL" || d.status === "DANGER") statusClass = "danger";
 
-  document.getElementById('data').innerHTML = `
-    🌡 Temperature: ${d.temp} °C <br><br>
-    💨 Wind: ${d.wind} km/h <br><br>
-    🤖 Status: <span class="${statusClass}">${d.status}</span> <br><br>
-    📈 Trend: ${d.trend} <br><br>
-    🧮 Score: ${d.score}/100 <br><br>
-    ⏱ Updated: ${d.updated}
-  `;
+  document.getElementById('status').innerHTML =
+    `<span class="${statusClass}">${d.status}</span>`;
 
-  updateChart(d.temp);
+  document.getElementById('trend').innerText = d.trend;
+  document.getElementById('score').innerText = d.score;
+
+  // push history
+  history.push(d.temp);
+
+  if (history.length > 20) history.shift();
+
+  updateChart();
 }
 
-function updateChart(temp) {
+function updateChart() {
 
   if (!chart) {
     chart = new Chart(document.getElementById('chart'), {
       type: 'line',
       data: {
-        labels: [new Date().toLocaleTimeString()],
+        labels: history.map((_, i) => i),
         datasets: [{
-          label: 'Temperature',
-          data: [temp],
+          label: 'Temperature Trend',
+          data: history,
+          tension: 0.3,
           borderWidth: 2
         }]
       }
     });
   } else {
-    chart.data.labels.push(new Date().toLocaleTimeString());
-    chart.data.datasets[0].data.push(temp);
-
-    if (chart.data.labels.length > 10) {
-      chart.data.labels.shift();
-      chart.data.datasets[0].data.shift();
-    }
-
+    chart.data.labels = history.map((_, i) => i);
+    chart.data.datasets[0].data = history;
     chart.update();
   }
 }
