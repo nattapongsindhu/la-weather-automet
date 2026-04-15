@@ -1,7 +1,7 @@
 <svg width="500" height="215" viewBox="0 0 500 215" xmlns="http://www.w3.org/2000/svg">
   <rect width="500" height="215" fill="#0b1a2a"/>
   <polyline fill="none" stroke="#00ffcc" stroke-width="2"
-    points="20.0,148.0 173.3,180.0 326.7,180.0 480.0,180.0"/>
-  <text x="10" y="15" font-size="10" fill="#aaa">Temp (°C) — last 4 readings</text>
-  <text x="10" y="210" font-size="9" fill="#556">Last updated: 2026-04-15 08:13 UTC</text>
+    points="20.0,132.0 135.0,164.0 250.0,164.0 365.0,164.0 480.0,180.0"/>
+  <text x="10" y="15" font-size="10" fill="#aaa">Temp (°C) — last 5 readings</text>
+  <text x="10" y="210" font-size="9" fill="#556">Last updated: 2026-04-15 08:34 UTC</text>
 </svg>
