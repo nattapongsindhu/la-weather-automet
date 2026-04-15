@@ -1,116 +1,16 @@
-name: go-auto-engine
+- name: Generate graph
+  run: |
+    echo "<svg width='500' height='200' xmlns='http://www.w3.org/2000/svg'>" > graph.svg
 
-on:
-  schedule:
-    - cron: "*/5 * * * *"
-  workflow_dispatch:
+    X=20
+    POINTS=""
 
-permissions:
-  contents: write
+    while read VALUE; do
+      Y=$((200 - VALUE * 3))
+      POINTS="$POINTS $X,$Y"
+      X=$((X+20))
+    done < temp.csv
 
-jobs:
-  engine:
-    runs-on: ubuntu-latest
+    echo "<polyline points='$POINTS' fill='none' stroke='blue' stroke-width='2'/>" >> graph.svg
 
-    steps:
-
-    # 1. Checkout
-    - name: Checkout repo
-      uses: actions/checkout@v4
-
-    # 2. Fetch weather
-    - name: Fetch weather
-      run: |
-        curl -s "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
-
-    # 3. Parse data
-    - name: Parse weather
-      run: |
-        TEMP=$(jq '.current_weather.temperature' weather.json)
-        WIND=$(jq '.current_weather.windspeed' weather.json)
-
-        echo "TEMP=$TEMP" >> $GITHUB_ENV
-        echo "WIND=$WIND" >> $GITHUB_ENV
-
-    # 4. AI Decision
-    - name: AI Decision
-      run: |
-        if [ "$TEMP" -gt 30 ]; then
-          STATUS="WARNING"
-          STATE="🟡"
-          COLOR="yellow"
-        elif [ "$TEMP" -lt 10 ]; then
-          STATUS="CRITICAL"
-          STATE="🔴"
-          COLOR="red"
-        else
-          STATUS="HEALTHY"
-          STATE="🟢"
-          COLOR="brightgreen"
-        fi
-
-        echo "STATUS=$STATUS" >> $GITHUB_ENV
-        echo "STATE=$STATE" >> $GITHUB_ENV
-        echo "COLOR=$COLOR" >> $GITHUB_ENV
-
-    # 5. Save temperature history
-    - name: Save temp history
-      run: |
-        if [ -f temp.csv ]; then
-          echo "$TEMP" >> temp.csv
-        else
-          echo "$TEMP" > temp.csv
-        fi
-
-        tail -n 20 temp.csv > temp_trim.csv
-        mv temp_trim.csv temp.csv
-
-    # 6. Generate graph (SVG)
-    - name: Generate graph
-      run: |
-        echo "<svg width='500' height='200' xmlns='http://www.w3.org/2000/svg'>" > graph.svg
-
-        X=20
-        PREV_Y=100
-
-        while read VALUE; do
-          Y=$(echo "200 - ($VALUE * 3)" | bc)
-          echo "<circle cx='$X' cy='$Y' r='3' fill='blue' />" >> graph.svg
-          echo "<line x1='$X' y1='$PREV_Y' x2='$X' y2='$Y' stroke='blue' />" >> graph.svg
-
-          PREV_Y=$Y
-          X=$((X+20))
-        done < temp.csv
-
-        echo "</svg>" >> graph.svg
-
-    # 7. Generate README
-    - name: Generate README
-      run: |
-        echo "# 🚀 Go Auto Engine Dashboard" > README.md
-        echo "" >> README.md
-
-        echo "![Status](https://img.shields.io/badge/status-$STATUS-$COLOR)" >> README.md
-        echo "" >> README.md
-
-        echo "## 🌐 Live Data" >> README.md
-        echo "- Temperature: ${TEMP}°C" >> README.md
-        echo "- Wind: ${WIND} km/h" >> README.md
-        echo "" >> README.md
-
-        echo "## 📈 Temperature Graph" >> README.md
-        echo "![graph](graph.svg)" >> README.md
-        echo "" >> README.md
-
-        echo "## 🧠 Status" >> README.md
-        echo "- $STATE $STATUS" >> README.md
-        echo "- Updated: $(date)" >> README.md
-
-    # 8. Commit
-    - name: Commit & push
-      run: |
-        git config user.name "auto-engine-bot"
-        git config user.email "bot@auto-engine.com"
-        git add README.md temp.csv graph.svg
-        git commit -m "📈 level 3 graph update" || echo "no changes"
-        git push
+    echo "</svg>" >> graph.svg
