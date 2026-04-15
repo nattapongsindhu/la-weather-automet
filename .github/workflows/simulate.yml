@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: weather-pipeline
+  cancel-in-progress: false
+
 jobs:
   engine:
     runs-on: ubuntu-latest
@@ -46,197 +50,64 @@ jobs:
           echo "DIRECTION=$DIRECTION" >> $GITHUB_ENV
           echo "IS_DAY=$IS_DAY"       >> $GITHUB_ENV
 
-      - name: Analyze
+      - name: Run tests
         run: |
-          python3 - <<'EOF'
-          import os
+          pip install pytest --break-system-packages -q
+          python3 -m pytest tests/ -v
 
-          temp  = float(os.environ["TEMP"])
-          wind  = float(os.environ["WIND"])
+      - name: Analyze
+        run: python3 scripts/analyze.py
+        env:
+          TEMP: ${{ env.TEMP }}
+          WIND: ${{ env.WIND }}
 
-          # Status classification
-          if temp > 30:
-              status = "HOT"
-          elif temp > 20:
-              status = "WARM"
-          elif temp < 5:
-              status = "COLD"
-          else:
-              status = "OK"
-
-          # Trend vs previous reading
-          trend = "Stable"
-          try:
-              with open("temp.csv") as f:
-                  lines = [l for l in f.read().strip().splitlines() if "," in l]
-              # skip header, get last data row
-              data_lines = [l for l in lines if not l.startswith("timestamp")]
-              if data_lines:
-                  last_temp = float(data_lines[-1].split(",")[1])
-                  diff = temp - last_temp
-                  if diff > 1.5:
-                      trend = "Rising"
-                  elif diff < -1.5:
-                      trend = "Falling"
-          except Exception:
-              pass
-
-          # Anomaly detection: compare vs 7-day average
-          anomaly = ""
-          try:
-              with open("temp.csv") as f:
-                  lines = [l for l in f.read().strip().splitlines() if "," in l]
-              data_lines = [l for l in lines if not l.startswith("timestamp")]
-              recent = []
-              for l in data_lines[-28:]:  # last 28 readings = ~7 days
-                  try:
-                      recent.append(float(l.split(",")[1]))
-                  except Exception:
-                      pass
-              if len(recent) >= 10:
-                  avg = sum(recent) / len(recent)
-                  sd  = (sum((x - avg)**2 for x in recent) / len(recent)) ** 0.5
-                  if sd > 0.5 and abs(temp - avg) > 2 * sd:
-                      anomaly = "ANOMALY"
-          except Exception:
-              pass
-
-          # Heat index score (0-100)
-          score = min(100, max(0, int(temp * 2 + wind * 0.5)))
-
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write(f"STATUS={status}\n")
-              f.write(f"TREND={trend}\n")
-              f.write(f"SCORE={score}\n")
-              f.write(f"ANOMALY={anomaly}\n")
-          EOF
-
-      - name: Update files
+      - name: Update CSV (trim to 200 rows)
         run: |
           TIMESTAMP=$(date -u "+%Y-%m-%dT%H:%M")
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
 
-          # --- temp.csv: create header if missing, append, trim to 200 rows ---
           if [ ! -f temp.csv ] || ! head -1 temp.csv | grep -q "timestamp"; then
             echo "timestamp,temperature,wind" > temp.csv
           fi
           echo "$TIMESTAMP,$TEMP,$WIND" >> temp.csv
 
-          # trim: keep header + last 200 data rows
           HEAD=$(head -1 temp.csv)
           TAIL=$(tail -n +2 temp.csv | tail -200)
           { echo "$HEAD"; echo "$TAIL"; } > temp_new.csv
           mv temp_new.csv temp.csv
 
-          # --- graph.svg ---
-          python3 - <<'EOF'
-          import csv, datetime
+      - name: Generate SVG
+        run: python3 scripts/generate_svg.py
 
-          rows = []
-          try:
-              with open("temp.csv") as f:
-                  reader = csv.DictReader(f)
-                  for row in reader:
-                      try:
-                          rows.append(float(row["temperature"]))
-                      except (ValueError, KeyError):
-                          pass
-          except Exception:
-              pass
-
-          rows = rows[-20:]
-          if not rows:
-              rows = [0]
-
-          w, h, pad = 500, 200, 20
-          min_t = min(rows)
-          max_t = max(rows)
-          span  = max(max_t - min_t, 1)
-
-          def px(i, val):
-              x = pad + i * (w - 2*pad) / max(len(rows)-1, 1)
-              y = h - pad - (val - min_t) / span * (h - 2*pad)
-              return f"{x:.1f},{y:.1f}"
-
-          points  = " ".join(px(i, v) for i, v in enumerate(rows))
-          updated = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-
-          svg = (
-              '<svg width="500" height="215" viewBox="0 0 500 215" xmlns="http://www.w3.org/2000/svg">'
-              '<rect width="500" height="215" fill="#0b1a2a"/>'
-              f'<polyline fill="none" stroke="#00ffcc" stroke-width="2" points="{points}"/>'
-              f'<text x="10" y="15" font-size="10" fill="#aaa">Temp (°C) — last {len(rows)} readings</text>'
-              f'<text x="10" y="210" font-size="9" fill="#556">Last updated: {updated}</text>'
-              '</svg>'
-          )
-
-          with open("graph.svg", "w") as f:
-              f.write(svg)
-          EOF
-
-          # --- data.json with checksum ---
-          python3 - <<'EOF'
-          import json, hashlib, os
-
-          d = {
-            "temp":      float(os.environ["TEMP"]),
-            "wind":      float(os.environ["WIND"]),
-            "direction": float(os.environ["DIRECTION"]),
-            "is_day":    os.environ["IS_DAY"] == "1",
-            "status":    os.environ["STATUS"],
-            "trend":     os.environ["TREND"],
-            "score":     int(os.environ["SCORE"]),
-            "anomaly":   os.environ.get("ANOMALY", ""),
-            "updated":   os.popen("date -u +%Y-%m-%dT%H:%M:%SZ").read().strip()
-          }
-
-          payload   = json.dumps(d, sort_keys=True)
-          d["sha256"] = hashlib.sha256(payload.encode()).hexdigest()[:16]
-
-          with open("data.json", "w") as f:
-              json.dump(d, f, indent=2)
-          print("data.json written:", d)
-          EOF
-
-          # --- history.txt ---
-          if [ ! -f history.txt ] || ! head -1 history.txt | grep -q "^timestamp"; then
-            echo "timestamp,temp,wind,status,trend,score,anomaly" > history.txt
-          fi
-          echo "$TIMESTAMP,$TEMP,$WIND,$STATUS,$TREND,$SCORE,$ANOMALY" >> history.txt
-
-          HEAD=$(head -1 history.txt)
-          TAIL=$(tail -n +2 history.txt | tail -100)
-          { echo "$HEAD"; echo "$TAIL"; } > history_new.txt
-          mv history_new.txt history.txt
+      - name: Update data.json and history.txt
+        run: python3 scripts/update_data.py
+        env:
+          TEMP:      ${{ env.TEMP }}
+          WIND:      ${{ env.WIND }}
+          DIRECTION: ${{ env.DIRECTION }}
+          IS_DAY:    ${{ env.IS_DAY }}
+          STATUS:    ${{ env.STATUS }}
+          TREND:     ${{ env.TREND }}
+          SCORE:     ${{ env.SCORE }}
+          ANOMALY:   ${{ env.ANOMALY }}
 
       - name: Validate data
         run: |
           python3 - <<'EOF'
           import json, sys
-
           with open("data.json") as f:
               d = json.load(f)
-
           errors = []
-          if not isinstance(d.get("temp"), (int, float)):
-              errors.append("temp missing or not a number")
-          if not isinstance(d.get("wind"), (int, float)):
-              errors.append("wind missing or not a number")
-          if d.get("status") not in ["OK", "WARM", "HOT", "COLD"]:
-              errors.append(f"invalid status: {d.get('status')}")
-          if not isinstance(d.get("score"), int):
-              errors.append("score missing or not an int")
-          if not d.get("updated"):
-              errors.append("updated timestamp missing")
-          if not d.get("sha256"):
-              errors.append("sha256 checksum missing")
-
+          if not isinstance(d.get("temp"), (int, float)):  errors.append("temp missing")
+          if not isinstance(d.get("wind"), (int, float)):  errors.append("wind missing")
+          if d.get("status") not in ["OK","WARM","HOT","COLD"]: errors.append("invalid status")
+          if not isinstance(d.get("score"), int):          errors.append("score missing")
+          if not d.get("updated"):                         errors.append("updated missing")
+          if not d.get("sha256"):                          errors.append("sha256 missing")
           if errors:
-              print("VALIDATION FAILED:")
-              for e in errors:
-                  print(f"  - {e}")
+              print("VALIDATION FAILED:", errors)
               sys.exit(1)
-
-          print(f"Validation passed: temp={d['temp']} wind={d['wind']} status={d['status']} score={d['score']}")
+          print(f"OK: temp={d['temp']} status={d['status']} score={d['score']}")
           EOF
 
       - name: Commit
@@ -244,6 +115,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions@users.noreply.github.com"
 
+          git pull --rebase origin main
           git add temp.csv graph.svg data.json history.txt weather.json
           git diff --cached --quiet && echo "no change, skipping" && exit 0
 
