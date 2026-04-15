@@ -21,13 +21,8 @@
 
 ## 📈 Graph
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/nattapongsindhu/go-auto-engine/main/graph.png" width="600"/>
-</p>
+<img src="./graph.svg" width="500"/>
 
 ---
 
 ## ⚙️ System Pipeline
-
-```text
-Fetch → Analyze → Predict → Score → Update
