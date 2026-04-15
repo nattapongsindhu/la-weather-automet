@@ -1,14 +1,15 @@
-# 🚀 Go Auto Engine Dashboard
+# 🚀 Go Auto Engine AI System
 
 ## 🌡️ Live Data
-- Temperature: 14.2 °C
+- Temp: 14.2 °C
 - Wind: 5.2 km/h
 
-## 🤖 AI Analysis
-- Status: HEALTHY
-- Reason: Normal condition
+## 🤖 AI Decision
+- State: HEALTHY
+- Reason: Normal
+
+## 📈 Prediction
 - Trend: STABLE
-- Updated: Wed Apr 15 05:53:53 UTC 2026
 
 ## 📊 Graph
 ```
@@ -20,9 +21,11 @@
 ##############
 ```
 
-## 🧠 System Flow
-Weather → Analyze → Decide → Predict → Update
+## 🧠 System Architecture
+Analyze → Decide → Predict → Update
 
 ## 📜 History
 🟢 🟢 🔴 🟢
 14.2
+
+_Auto updated by AI agents_
