@@ -63,19 +63,21 @@
 
     .updated {
       font-size: 0.75rem;
-      color: #456;
-      margin-top: 1rem;
+      color: #7ab;
+      margin-top: 0.5rem;
     }
 
     #error-msg {
       color: #f66;
       display: none;
       margin-top: 1rem;
+      font-size: 0.85rem;
     }
   </style>
 </head>
 <body>
 
+<!-- v3 -->
 <h1>🚀 LA Weather Automet</h1>
 <p class="subtitle">Fetch → Analyze → Score → Visualize</p>
 
@@ -107,44 +109,41 @@
 </div>
 
 <p class="updated" id="updated-at"></p>
-<p id="error-msg">⚠️ Failed to load data. Please try again later.</p>
+<p id="error-msg" style="display:none">⚠️ Failed to load data. Please try again later.</p>
 
 <script>
 let chartInstance = null;
 
 async function load() {
   try {
-    // --- data.json ---
     const res = await fetch("./data.json?t=" + Date.now());
     if (!res.ok) throw new Error("data.json fetch failed");
     const d = await res.json();
 
-    document.getElementById("val-temp").textContent   = d.temp ?? "—";
-    document.getElementById("val-wind").textContent   = d.wind ?? "—";
-    document.getElementById("val-trend").textContent  = d.trend ?? "";
+    document.getElementById("val-temp").textContent  = d.temp  ?? "—";
+    document.getElementById("val-wind").textContent  = d.wind  ?? "—";
+    document.getElementById("val-trend").textContent = d.trend ?? "";
+    document.getElementById("val-score").textContent = d.score ?? "—";
 
     const statusEl = document.getElementById("val-status");
     statusEl.textContent = d.status ?? "—";
     statusEl.className = "value status-" + (d.status ?? "");
-
-    document.getElementById("val-score").textContent  = d.score ?? "—";
 
     if (d.updated) {
       document.getElementById("updated-at").textContent =
         "Last updated: " + new Date(d.updated).toLocaleString();
     }
 
-    // --- temp.csv ---
     const csvRes = await fetch("./temp.csv?t=" + Date.now());
     if (!csvRes.ok) throw new Error("temp.csv fetch failed");
     const text = await csvRes.text();
 
-    const rows = text.trim().split("\n").slice(1); // skip header
+    const rows   = text.trim().split("\n").slice(1);
     const last20 = rows.slice(-20);
 
     const labels = last20.map(r => {
       const ts = r.split(",")[0];
-      try { return new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+      try { return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
       catch { return ts; }
     });
 
@@ -171,15 +170,15 @@ async function load() {
       },
       options: {
         responsive: true,
-        plugins: {
-          legend: { labels: { color: "#aac" } }
-        },
+        plugins: { legend: { labels: { color: "#aac" } } },
         scales: {
           x: { ticks: { color: "#7ab", maxRotation: 45 }, grid: { color: "#1e3a5f" } },
-          y: { ticks: { color: "#7ab" }, grid: { color: "#1e3a5f" } }
+          y: { ticks: { color: "#7ab" },                  grid: { color: "#1e3a5f" } }
         }
       }
     });
+
+    document.getElementById("error-msg").style.display = "none";
 
   } catch (err) {
     console.error(err);
@@ -188,7 +187,6 @@ async function load() {
 }
 
 load();
-// Auto-refresh every 10 minutes
 setInterval(load, 10 * 60 * 1000);
 </script>
 
