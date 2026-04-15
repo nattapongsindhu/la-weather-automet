@@ -17,23 +17,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. สร้าง README
+      # 2. สร้างสถานะแบบสุ่ม (Chaos Mode)
+      - name: Generate Status
+        id: status
+        run: |
+          RAND=$((RANDOM % 3))
+
+          if [ $RAND -eq 0 ]; then
+            echo "STATE=HEALTHY 🟢" >> $GITHUB_ENV
+          elif [ $RAND -eq 1 ]; then
+            echo "STATE=WARNING 🟡" >> $GITHUB_ENV
+          else
+            echo "STATE=CRITICAL 🔴" >> $GITHUB_ENV
+          fi
+
+      # 3. สร้าง README
       - name: Generate README
         run: |
           echo "# 🚀 Go Auto Engine" > README.md
           echo "" >> README.md
           echo "## 🧠 System Status" >> README.md
-          echo "- Status: Running ⚙️" >> README.md
+          echo "- Status: $STATE" >> README.md
           echo "- Time: $(date)" >> README.md
           echo "" >> README.md
           echo "## 🔄 Auto Update" >> README.md
           echo "This file is updated automatically by GitHub Actions." >> README.md
 
-      # 3. commit + push
+      # 4. commit + push
       - name: Commit and push
         run: |
           git config user.name "auto-engine-bot"
           git config user.email "bot@auto-engine.com"
           git add README.md
-          git commit -m "🤖 auto update README" || echo "no changes"
+          git commit -m "🤖 auto update ($STATE)" || echo "no changes"
           git push
