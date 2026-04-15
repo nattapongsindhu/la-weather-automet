@@ -21,9 +21,7 @@
 
 ## 📈 Graph
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/nattapongsindhu/go-auto-engine/main/graph.svg" width="600"/>
-</p>
+<img src="https://raw.githubusercontent.com/nattapongsindhu/go-auto-engine/main/graph.svg?v=1"/>
 
 ---
 
