@@ -1,77 +1,37 @@
-name: go-auto-engine
+- name: Fetch weather (Open-Meteo)
+  run: |
+    curl -s "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
 
-on:
-  schedule:
-    - cron: '*/5 * * * *'
-  workflow_dispatch:
+- name: Parse weather
+  run: |
+    TEMP=$(cat weather.json | jq '.current_weather.temperature')
+    WIND=$(cat weather.json | jq '.current_weather.windspeed')
 
-permissions:
-  contents: write
+    echo "TEMP=$TEMP" >> $GITHUB_ENV
+    echo "WIND=$WIND" >> $GITHUB_ENV
 
-jobs:
+- name: Decide based on weather
+  run: |
+    if (( $(echo "$TEMP > 30" | bc -l) )); then
+      echo "STATE=WARNING 🟡" >> $GITHUB_ENV
+      echo "REASON=Too hot" >> $GITHUB_ENV
+    elif (( $(echo "$TEMP < 10" | bc -l) )); then
+      echo "STATE=CRITICAL 🔴" >> $GITHUB_ENV
+      echo "REASON=Too cold" >> $GITHUB_ENV
+    else
+      echo "STATE=HEALTHY 🟢" >> $GITHUB_ENV
+      echo "REASON=Good weather" >> $GITHUB_ENV
+    fi
 
-  # 🤖 Agent A: Analyze
-  analyze:
-    runs-on: ubuntu-latest
-    outputs:
-      count: ${{ steps.count.outputs.count }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - id: count
-        run: |
-          COUNT=$(git rev-list --count HEAD)
-          echo "count=$COUNT" >> $GITHUB_OUTPUT
-
-  # 🧠 Agent B: Decide
-  decide:
-    runs-on: ubuntu-latest
-    needs: analyze
-    outputs:
-      state: ${{ steps.decision.outputs.state }}
-      status: ${{ steps.decision.outputs.status }}
-
-    steps:
-      - id: decision
-        run: |
-          COUNT=${{ needs.analyze.outputs.count }}
-
-          if [ $COUNT -gt 10 ]; then
-            echo "state=🟢" >> $GITHUB_OUTPUT
-            echo "status=HEALTHY" >> $GITHUB_OUTPUT
-          elif [ $COUNT -gt 5 ]; then
-            echo "state=🟡" >> $GITHUB_OUTPUT
-            echo "status=WARNING" >> $GITHUB_OUTPUT
-          else
-            echo "state=🔴" >> $GITHUB_OUTPUT
-            echo "status=CRITICAL" >> $GITHUB_OUTPUT
-          fi
-
-  # 📊 Agent C: Update
-  update:
-    runs-on: ubuntu-latest
-    needs: [analyze, decide]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Generate README
-        run: |
-          echo "# 🚀 Go Auto Engine" > README.md
-          echo "" >> README.md
-          echo "## 🧠 System Status" >> README.md
-          echo "- Status: ${{ needs.decide.outputs.status }} ${{ needs.decide.outputs.state }}" >> README.md
-          echo "- Total Commits: ${{ needs.analyze.outputs.count }}" >> README.md
-          echo "- Time: $(date)" >> README.md
-          echo "" >> README.md
-          echo "## 🤖 Multi-Agent System" >> README.md
-          echo "- Analyze → Decide → Update" >> README.md
-
-      - name: Commit and push
-        run: |
-          git config user.name "auto-engine-bot"
-          git config user.email "bot@auto-engine.com"
-          git add README.md
-          git commit -m "🤖 multi-agent update" || echo "no changes"
-          git push
+- name: Generate README
+  run: |
+    echo "# 🚀 Go Auto Engine" > README.md
+    echo "" >> README.md
+    echo "## 🌐 Real Data System" >> README.md
+    echo "- Temperature: ${TEMP}°C" >> README.md
+    echo "- Wind Speed: ${WIND} km/h" >> README.md
+    echo "" >> README.md
+    echo "## 🧠 Decision" >> README.md
+    echo "- Status: $STATE" >> README.md
+    echo "- Reason: $REASON" >> README.md
+    echo "- Time: $(date)" >> README.md
