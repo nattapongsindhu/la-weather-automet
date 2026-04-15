@@ -2,7 +2,7 @@ name: go-auto-engine-ai
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,123 +13,111 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout
+      # 1. Checkout repo
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Fix jq (สำคัญมาก)
-      - name: Install jq
-        run: |
-          sudo apt-get update
-          sudo apt-get install jq -y
+      # 2. Install tools
+      - name: Install tools
+        run: sudo apt-get install -y jq bc
 
-      # 3. Fetch weather
+      # 3. Fetch weather data
       - name: Fetch weather
         run: |
           curl -s "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
 
-      # 4. Parse data
-      - name: Parse weather
-        run: |
-          TEMP=$(jq '.current_weather.temperature' weather.json)
-          WIND=$(jq '.current_weather.windspeed' weather.json)
+          TEMP=$(cat weather.json | jq '.current_weather.temperature')
+          WIND=$(cat weather.json | jq '.current_weather.windspeed')
 
           echo "TEMP=$TEMP" >> $GITHUB_ENV
           echo "WIND=$WIND" >> $GITHUB_ENV
 
-      # 5. Save history
-      - name: Save history
+      # 4. Decide state
+      - name: AI decision
         run: |
-          echo "$TEMP" >> temp.csv
-          tail -n 20 temp.csv > temp.tmp && mv temp.tmp temp.csv
-
-      # 6. Trend analysis
-      - name: Trend analysis
-        run: |
-          COUNT=$(wc -l < temp.csv)
-
-          if [ "$COUNT" -ge 5 ]; then
-            AVG=$(tail -n 5 temp.csv | awk '{sum+=$1} END {print sum/NR}')
+          if (( $(echo "$TEMP > 30" | bc -l) )); then
+            STATE="WARNING"
+            REASON="Too hot"
+          elif (( $(echo "$TEMP < 10" | bc -l) )); then
+            STATE="CRITICAL"
+            REASON="Too cold"
           else
-            AVG=$TEMP
+            STATE="HEALTHY"
+            REASON="Normal condition"
           fi
 
-          echo "AVG=$AVG" >> $GITHUB_ENV
+          echo "STATE=$STATE" >> $GITHUB_ENV
+          echo "REASON=$REASON" >> $GITHUB_ENV
 
-      # 7. AI Prediction
-      - name: AI Prediction
+      # 5. Prediction (trend)
+      - name: Predict trend
         run: |
-          if (( $(echo "$TEMP > $AVG" | bc -l) )); then
-            TREND="📈 Rising"
-            PREDICT="🔥 Temperature increasing"
-          elif (( $(echo "$TEMP < $AVG" | bc -l) )); then
-            TREND="📉 Falling"
-            PREDICT="❄️ Cooling down"
+          if [ ! -f history.txt ]; then
+            echo "$TEMP" > history.txt
           else
-            TREND="➖ Stable"
-            PREDICT="😐 No major change"
+            echo "$TEMP" >> history.txt
+          fi
+
+          LAST=$(tail -n 2 history.txt | head -n 1)
+          if (( $(echo "$TEMP > $LAST" | bc -l) )); then
+            TREND="UP"
+          elif (( $(echo "$TEMP < $LAST" | bc -l) )); then
+            TREND="DOWN"
+          else
+            TREND="STABLE"
           fi
 
           echo "TREND=$TREND" >> $GITHUB_ENV
-          echo "PREDICT=$PREDICT" >> $GITHUB_ENV
 
-      # 8. System decision
-      - name: Decision
-        run: |
-          if (( $(echo "$TEMP > 30" | bc -l) )); then
-            STATUS="⚠️ WARNING"
-            INSIGHT="Too hot"
-          elif (( $(echo "$TEMP < 10" | bc -l) )); then
-            STATUS="🔴 CRITICAL"
-            INSIGHT="Too cold"
-          else
-            STATUS="🟢 HEALTHY"
-            INSIGHT="Normal"
-          fi
-
-          echo "STATUS=$STATUS" >> $GITHUB_ENV
-          echo "INSIGHT=$INSIGHT" >> $GITHUB_ENV
-
-      # 9. Generate graph (ASCII)
+      # 6. Generate graph (FIXED multiline bug)
       - name: Generate graph
         run: |
           GRAPH=""
-          for T in $(tail -n 10 temp.csv); do
+          for T in $(tail -n 10 history.txt); do
             BAR=$(printf "%0.s#" $(seq 1 ${T%.*}))
             GRAPH="$GRAPH\n$BAR"
           done
 
-          echo -e "GRAPH=$GRAPH" >> $GITHUB_ENV
+          echo "GRAPH<<EOF" >> $GITHUB_ENV
+          echo -e "$GRAPH" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
-      # 10. Generate README
-      - name: Update README
+      # 7. Generate README dashboard
+      - name: Generate README
         run: |
           echo "# 🚀 Go Auto Engine Dashboard" > README.md
           echo "" >> README.md
 
-          echo "## 📊 Live Data" >> README.md
-          echo "- 🌡 Temperature: $TEMP°C" >> README.md
-          echo "- 💨 Wind: $WIND km/h" >> README.md
+          echo "## 🌡️ Live Data" >> README.md
+          echo "- Temperature: $TEMP °C" >> README.md
+          echo "- Wind: $WIND km/h" >> README.md
           echo "" >> README.md
 
           echo "## 🤖 AI Analysis" >> README.md
-          echo "- Status: $STATUS" >> README.md
-          echo "- Insight: $INSIGHT" >> README.md
+          echo "- Status: $STATE" >> README.md
+          echo "- Reason: $REASON" >> README.md
           echo "- Trend: $TREND" >> README.md
-          echo "- Prediction: $PREDICT" >> README.md
           echo "- Updated: $(date)" >> README.md
           echo "" >> README.md
 
-          echo "## 📈 Temperature Graph" >> README.md
+          echo "## 📊 Graph" >> README.md
           echo '```' >> README.md
           echo -e "$GRAPH" >> README.md
           echo '```' >> README.md
+          echo "" >> README.md
 
-      # 11. Commit
-      - name: Commit
+          echo "## 🧠 System Flow" >> README.md
+          echo "Weather → Analyze → Decide → Predict → Update" >> README.md
+          echo "" >> README.md
+
+          echo "## 📜 History" >> README.md
+          tail -n 5 history.txt >> README.md
+
+      # 8. Commit & push
+      - name: Commit changes
         run: |
           git config user.name "auto-engine-bot"
-          git config user.email "bot@auto.com"
+          git config user.email "bot@auto-engine.com"
           git add .
-          git commit -m "🤖 AI prediction update" || echo "no changes"
+          git commit -m "AI auto update" || echo "no changes"
           git push
