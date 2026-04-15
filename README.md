@@ -1,9 +1,6 @@
-# 🚀 Go Auto Engine Dashboard
+# 🚀 Go Auto Engine
 
-![status](https://img.shields.io/badge/status-active-success)
-![automation](https://img.shields.io/badge/automation-running-blue)
-![mode](https://img.shields.io/badge/mode-balanced-purple)
-![ai](https://img.shields.io/badge/AI-lite-orange)
+🚀 Autonomous AI-powered monitoring system built with GitHub Actions — real-time data, predictive insights, and zero-cost infrastructure.
 
 ---
 
@@ -29,11 +26,65 @@
 
 ## 📈 System Graph
 
-<img src="./graph.svg" width="600"/>
+<img src="./graph.svg" width="700"/>
 
 ---
 
 ## ⚙️ System Pipeline
 
-```text
 Fetch Data → Analyze → Predict → Score → Update
+
+---
+
+## 📜 History
+
+${HISTORY}
+
+---
+
+## 🧩 Features
+
+- ✅ Fully automated system (GitHub Actions)
+- ✅ Real-time data pipeline (Open-Meteo API)
+- ✅ AI-style decision engine (analyze / predict / score)
+- ✅ Auto commit + history tracking
+- ✅ Live dashboard via GitHub Pages
+- ✅ Graph visualization (SVG)
+
+---
+
+## 🛠 Tech Stack
+
+- GitHub Actions (CI/CD automation)
+- Bash scripting
+- Open-Meteo API (Free)
+- HTML / JavaScript Dashboard
+- SVG Graph rendering
+
+---
+
+## 🔐 Cost & Safety
+
+- 💸 Cost: **$0 (100% Free)**
+- 🔐 No API key required
+- 🛡 Safe GitHub usage (no spam behavior)
+- ✅ Legit automation workflow
+
+---
+
+## 💼 Why This Project Matters
+
+This project demonstrates:
+
+- Real-world automation using CI/CD
+- Data pipeline + processing logic
+- Frontend dashboard integration
+- Self-updating system without backend
+
+---
+
+## ⚡ Powered By
+
+- GitHub Actions
+- Open-Meteo API
+- Your brain 🧠🔥
