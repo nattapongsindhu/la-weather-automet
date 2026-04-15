@@ -13,10 +13,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      # ✅ Fetch weather
       - name: Fetch weather
         run: |
           curl -s "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
 
+      # ✅ Parse JSON (ใช้ jq อย่างเดียว ไม่พัง)
       - name: Parse data
         run: |
           TEMP=$(jq '.current_weather.temperature' weather.json)
@@ -25,12 +27,13 @@ jobs:
           echo "TEMP=$TEMP" >> $GITHUB_ENV
           echo "WIND=$WIND" >> $GITHUB_ENV
 
+      # ✅ Logic (เอา bc ออก → กันพัง)
       - name: AI logic
         run: |
-          if (( $(echo "$TEMP > 30" | bc -l) )); then
+          if [ "$TEMP" -gt 30 ]; then
             STATUS="WARNING"
             SCORE=60
-          elif (( $(echo "$TEMP < 10" | bc -l) )); then
+          elif [ "$TEMP" -lt 10 ]; then
             STATUS="CRITICAL"
             SCORE=30
           else
@@ -41,25 +44,38 @@ jobs:
           echo "STATUS=$STATUS" >> $GITHUB_ENV
           echo "SCORE=$SCORE" >> $GITHUB_ENV
 
+      # ✅ Create CSV (กันไฟล์หาย)
       - name: Update CSV
         run: |
+          touch temp.csv
           echo "$(date +%s),$TEMP" >> temp.csv
 
-      - name: Generate PNG graph
+      # ✅ Generate graph (ใช้ python แทน gnuplot = เสถียรสุด)
+      - name: Generate graph PNG
         run: |
-          sudo apt-get install -y gnuplot
+          python3 <<EOF
+import matplotlib.pyplot as plt
+import csv
 
-          echo "
-          set terminal png size 800,400
-          set output 'graph.png'
-          set title 'Temperature History'
-          set xlabel 'Time'
-          set ylabel 'Temp'
-          plot 'temp.csv' using 1:2 with lines
-          " > plot.gp
+x = []
+y = []
 
-          gnuplot plot.gp
+with open('temp.csv') as f:
+    reader = csv.reader(f)
+    for row in reader:
+        if len(row) == 2:
+            x.append(int(row[0]))
+            y.append(float(row[1]))
 
+plt.figure(figsize=(8,4))
+plt.plot(x, y)
+plt.title("Temperature History")
+plt.xlabel("Time")
+plt.ylabel("Temp")
+plt.savefig("graph.png")
+EOF
+
+      # ✅ Update JSON
       - name: Update JSON
         run: |
           echo "{
@@ -71,10 +87,12 @@ jobs:
             \"updated\": \"$(date)\"
           }" > data.json
 
+      # ✅ Commit (กัน fail ถ้าไม่มี change)
       - name: Commit changes
         run: |
           git config user.name "bot"
           git config user.email "bot@users.noreply.github.com"
+
           git add .
           git commit -m "auto update" || echo "no changes"
           git push
