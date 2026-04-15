@@ -17,46 +17,77 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. นับ commit ล่าสุด
-      - name: Analyze activity
-        id: activity
+      # 2. สร้างสถานะใหม่ (ยังใช้ logic เดิม)
+      - name: Generate status
         run: |
           COUNT=$(git rev-list --count HEAD)
-          echo "COUNT=$COUNT" >> $GITHUB_ENV
 
-      # 3. Decision logic (AI-like)
-      - name: Decide status
-        run: |
           if [ $COUNT -gt 10 ]; then
-            echo "STATE=HEALTHY 🟢" >> $GITHUB_ENV
-            echo "REASON=High activity" >> $GITHUB_ENV
+            STATE="🟢"
+            STATUS="HEALTHY"
           elif [ $COUNT -gt 5 ]; then
-            echo "STATE=WARNING 🟡" >> $GITHUB_ENV
-            echo "REASON=Moderate activity" >> $GITHUB_ENV
+            STATE="🟡"
+            STATUS="WARNING"
           else
-            echo "STATE=CRITICAL 🔴" >> $GITHUB_ENV
-            echo "REASON=Low activity" >> $GITHUB_ENV
+            STATE="🔴"
+            STATUS="CRITICAL"
           fi
 
-      # 4. สร้าง README
+          echo "STATE=$STATE" >> $GITHUB_ENV
+          echo "STATUS=$STATUS" >> $GITHUB_ENV
+
+      # 3. โหลด history เก่า
+      - name: Load history
+        run: |
+          if [ -f history.txt ]; then
+            HISTORY=$(cat history.txt)
+          else
+            HISTORY=""
+          fi
+
+          echo "HISTORY=$HISTORY" >> $GITHUB_ENV
+
+      # 4. update history
+      - name: Update history
+        run: |
+          NEW_HISTORY="$HISTORY $STATE"
+          echo $NEW_HISTORY > history.txt
+          echo "NEW_HISTORY=$NEW_HISTORY" >> $GITHUB_ENV
+
+      # 5. วิเคราะห์ trend
+      - name: Analyze trend
+        run: |
+          if [[ "$NEW_HISTORY" == *"🟢 🟢 🟢"* ]]; then
+            TREND="IMPROVING 📈"
+          elif [[ "$NEW_HISTORY" == *"🔴 🔴"* ]]; then
+            TREND="DECLINING 📉"
+          else
+            TREND="STABLE ➖"
+          fi
+
+          echo "TREND=$TREND" >> $GITHUB_ENV
+
+      # 6. สร้าง README
       - name: Generate README
         run: |
           echo "# 🚀 Go Auto Engine" > README.md
           echo "" >> README.md
           echo "## 🧠 System Status" >> README.md
-          echo "- Status: $STATE" >> README.md
-          echo "- Reason: $REASON" >> README.md
-          echo "- Total Commits: $COUNT" >> README.md
+          echo "- Status: $STATUS $STATE" >> README.md
+          echo "- Trend: $TREND" >> README.md
           echo "- Time: $(date)" >> README.md
+          echo "" >> README.md
+          echo "## 📊 History" >> README.md
+          echo "$NEW_HISTORY" >> README.md
           echo "" >> README.md
           echo "## 🔄 Auto Update" >> README.md
           echo "This file is updated automatically by GitHub Actions." >> README.md
 
-      # 5. commit + push
+      # 7. commit + push
       - name: Commit and push
         run: |
           git config user.name "auto-engine-bot"
           git config user.email "bot@auto-engine.com"
-          git add README.md
-          git commit -m "🤖 AI update ($STATE)" || echo "no changes"
+          git add README.md history.txt
+          git commit -m "📊 trend update ($STATUS)" || echo "no changes"
           git push
