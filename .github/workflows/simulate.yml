@@ -10,16 +10,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # ✅ Fetch weather
+      # ✅ Fetch data
       - name: Fetch weather
         run: |
           curl -s "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
 
-      # ✅ Parse JSON (ใช้ jq อย่างเดียว ไม่พัง)
-      - name: Parse data
+      # ✅ Extract (safe)
+      - name: Extract values
         run: |
           TEMP=$(jq '.current_weather.temperature' weather.json)
           WIND=$(jq '.current_weather.windspeed' weather.json)
@@ -27,53 +27,28 @@ jobs:
           echo "TEMP=$TEMP" >> $GITHUB_ENV
           echo "WIND=$WIND" >> $GITHUB_ENV
 
-      # ✅ Logic (เอา bc ออก → กันพัง)
-      - name: AI logic
+      # ✅ Simple logic (ไม่ใช้ bc)
+      - name: Logic
         run: |
           if [ "$TEMP" -gt 30 ]; then
-            STATUS="WARNING"
-            SCORE=60
-          elif [ "$TEMP" -lt 10 ]; then
-            STATUS="CRITICAL"
-            SCORE=30
+            STATUS="HOT"
           else
-            STATUS="HEALTHY"
-            SCORE=90
+            STATUS="OK"
           fi
 
           echo "STATUS=$STATUS" >> $GITHUB_ENV
-          echo "SCORE=$SCORE" >> $GITHUB_ENV
 
-      # ✅ Create CSV (กันไฟล์หาย)
+      # ✅ Update CSV (format เดียวเท่านั้น!)
       - name: Update CSV
         run: |
-          touch temp.csv
-          echo "$(date +%s),$TEMP" >> temp.csv
+          echo "$TEMP" >> temp.csv
 
-      # ✅ Generate graph (ใช้ python แทน gnuplot = เสถียรสุด)
-      - name: Generate graph PNG
+      # ✅ Generate simple graph (ไม่ใช้ lib)
+      - name: Generate graph (simple SVG)
         run: |
-          python3 <<EOF
-import matplotlib.pyplot as plt
-import csv
-
-x = []
-y = []
-
-with open('temp.csv') as f:
-    reader = csv.reader(f)
-    for row in reader:
-        if len(row) == 2:
-            x.append(int(row[0]))
-            y.append(float(row[1]))
-
-plt.figure(figsize=(8,4))
-plt.plot(x, y)
-plt.title("Temperature History")
-plt.xlabel("Time")
-plt.ylabel("Temp")
-plt.savefig("graph.png")
-EOF
+          echo "<svg xmlns='http://www.w3.org/2000/svg' width='300' height='100'>
+          <text x='10' y='50' fill='white'>Temp: $TEMP</text>
+          </svg>" > graph.svg
 
       # ✅ Update JSON
       - name: Update JSON
@@ -81,18 +56,15 @@ EOF
           echo "{
             \"temp\": $TEMP,
             \"wind\": $WIND,
-            \"status\": \"$STATUS\",
-            \"trend\": \"Stable\",
-            \"score\": $SCORE,
-            \"updated\": \"$(date)\"
+            \"status\": \"$STATUS\"
           }" > data.json
 
-      # ✅ Commit (กัน fail ถ้าไม่มี change)
-      - name: Commit changes
+      # ✅ Commit (กันพัง)
+      - name: Commit
         run: |
           git config user.name "bot"
           git config user.email "bot@users.noreply.github.com"
 
           git add .
-          git commit -m "auto update" || echo "no changes"
+          git commit -m "safe update" || echo "no change"
           git push
