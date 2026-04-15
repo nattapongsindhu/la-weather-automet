@@ -1,6 +1,8 @@
 name: go-auto-engine
 
 on:
+  schedule:
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -11,16 +13,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. checkout
+      # 1. โหลด repo
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 2. fetch weather
-      - name: Fetch weather
+      # 2. ดึงข้อมูล weather (ฟรี API)
+      - name: Fetch weather (Open-Meteo)
         run: |
           curl -s "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
 
-      # 3. parse json
+      # 3. parse JSON
       - name: Parse weather
         run: |
           TEMP=$(jq '.current_weather.temperature' weather.json)
@@ -29,39 +31,49 @@ jobs:
           echo "TEMP=$TEMP" >> $GITHUB_ENV
           echo "WIND=$WIND" >> $GITHUB_ENV
 
-      # 4. decision (ไม่ใช้ bc แล้ว)
-      - name: Decide
+      # 4. AI-like decision (ฟรี 100%)
+      - name: Smart Decision
         run: |
           if [ "$TEMP" -gt 30 ]; then
             echo "STATE=WARNING 🟡" >> $GITHUB_ENV
-            echo "REASON=Too hot" >> $GITHUB_ENV
+            echo "REASON=Temperature is high. System performance may degrade under heat conditions." >> $GITHUB_ENV
+
           elif [ "$TEMP" -lt 10 ]; then
             echo "STATE=CRITICAL 🔴" >> $GITHUB_ENV
-            echo "REASON=Too cold" >> $GITHUB_ENV
+            echo "REASON=Temperature is too low. System stability could be affected by extreme cold." >> $GITHUB_ENV
+
           else
             echo "STATE=HEALTHY 🟢" >> $GITHUB_ENV
-            echo "REASON=Good weather" >> $GITHUB_ENV
+            echo "REASON=Environmental conditions are optimal. System operating normally." >> $GITHUB_ENV
           fi
 
-      # 5. generate README
+      # 5. สร้าง README
       - name: Generate README
         run: |
           echo "# 🚀 Go Auto Engine" > README.md
           echo "" >> README.md
-          echo "## 🌐 Real Weather Data" >> README.md
-          echo "- Temperature: ${TEMP}°C" >> README.md
-          echo "- Wind: ${WIND} km/h" >> README.md
-          echo "" >> README.md
-          echo "## 🧠 Decision" >> README.md
-          echo "- Status: $STATE" >> README.md
-          echo "- Reason: $REASON" >> README.md
-          echo "- Time: $(date)" >> README.md
 
-      # 6. commit
+          echo "## 🌐 Real Weather Data (LA)" >> README.md
+          echo "- Temperature: ${TEMP}°C" >> README.md
+          echo "- Wind Speed: ${WIND} km/h" >> README.md
+          echo "" >> README.md
+
+          echo "## 🧠 AI Analysis (Free Mode)" >> README.md
+          echo "- Status: $STATE" >> README.md
+          echo "- Insight: $REASON" >> README.md
+          echo "- Time: $(date)" >> README.md
+          echo "" >> README.md
+
+          echo "## 🔄 System Info" >> README.md
+          echo "- Engine: Go-Auto-Engine" >> README.md
+          echo "- Mode: AI-like (Rule-based)" >> README.md
+          echo "- Cost: FREE 💸" >> README.md
+
+      # 6. commit กลับ repo
       - name: Commit and push
         run: |
           git config user.name "auto-engine-bot"
           git config user.email "bot@auto-engine.com"
           git add README.md
-          git commit -m "🌐 real weather update" || echo "no changes"
+          git commit -m "🤖 auto update (real data + AI)" || echo "no changes"
           git push
