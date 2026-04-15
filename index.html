@@ -2,6 +2,9 @@
 <html>
 <head>
   <title>AI Dashboard</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     body {
       font-family: Arial;
@@ -10,38 +13,89 @@
       text-align: center;
       padding: 40px;
     }
+
     .card {
       background: #1e293b;
       padding: 20px;
-      margin: 10px;
+      margin: 10px auto;
       border-radius: 12px;
+      width: 400px;
     }
-    h1 { color: #38bdf8; }
+
+    .healthy { color: #22c55e; }
+    .warning { color: #facc15; }
+    .danger { color: #ef4444; }
+
+    canvas {
+      margin-top: 20px;
+    }
   </style>
 </head>
+
 <body>
 
 <h1>🚀 AI Monitoring Dashboard</h1>
 
 <div class="card" id="data">Loading...</div>
 
+<div class="card">
+  <canvas id="chart"></canvas>
+</div>
+
 <script>
+
+let chart;
+
 async function loadData() {
   const res = await fetch('./data.json');
   const d = await res.json();
 
+  let statusClass = "healthy";
+  if (d.status === "WARNING") statusClass = "warning";
+  if (d.status === "CRITICAL" || d.status === "DANGER") statusClass = "danger";
+
   document.getElementById('data').innerHTML = `
     🌡 Temperature: ${d.temp} °C <br><br>
     💨 Wind: ${d.wind} km/h <br><br>
-    🤖 Status: ${d.status} <br><br>
+    🤖 Status: <span class="${statusClass}">${d.status}</span> <br><br>
     📈 Trend: ${d.trend} <br><br>
-    🧮 Score: ${d.score} / 100 <br><br>
+    🧮 Score: ${d.score}/100 <br><br>
     ⏱ Updated: ${d.updated}
   `;
+
+  updateChart(d.temp);
+}
+
+function updateChart(temp) {
+
+  if (!chart) {
+    chart = new Chart(document.getElementById('chart'), {
+      type: 'line',
+      data: {
+        labels: [new Date().toLocaleTimeString()],
+        datasets: [{
+          label: 'Temperature',
+          data: [temp],
+          borderWidth: 2
+        }]
+      }
+    });
+  } else {
+    chart.data.labels.push(new Date().toLocaleTimeString());
+    chart.data.datasets[0].data.push(temp);
+
+    if (chart.data.labels.length > 10) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+    }
+
+    chart.update();
+  }
 }
 
 loadData();
 setInterval(loadData, 60000);
+
 </script>
 
 </body>
