@@ -14,43 +14,53 @@ jobs:
 
     steps:
 
-    # 1. Checkout repo
-    - name: Checkout repository
+    # 1. Checkout
+    - name: Checkout repo
       uses: actions/checkout@v4
 
-    # 2. Fetch weather data
-    - name: Fetch weather (Open-Meteo)
+    # 2. Fetch weather
+    - name: Fetch weather
       run: |
         curl -s "https://api.open-meteo.com/v1/forecast?latitude=34.05&longitude=-118.24&current_weather=true" > weather.json
 
     # 3. Parse data
     - name: Parse weather
       run: |
-        TEMP=$(cat weather.json | jq '.current_weather.temperature')
-        WIND=$(cat weather.json | jq '.current_weather.windspeed')
+        TEMP=$(jq '.current_weather.temperature' weather.json)
+        WIND=$(jq '.current_weather.windspeed' weather.json)
 
         echo "TEMP=$TEMP" >> $GITHUB_ENV
         echo "WIND=$WIND" >> $GITHUB_ENV
 
-    # 4. AI Decision Logic
+    # 4. AI decision
     - name: AI Decision
       run: |
-        if (( $(echo "$TEMP > 30" | bc -l) )); then
-          echo "STATUS=WARNING" >> $GITHUB_ENV
-          echo "STATE=🟡" >> $GITHUB_ENV
-          echo "REASON=Too hot" >> $GITHUB_ENV
-        elif (( $(echo "$TEMP < 10" | bc -l) )); then
-          echo "STATUS=CRITICAL" >> $GITHUB_ENV
-          echo "STATE=🔴" >> $GITHUB_ENV
-          echo "REASON=Too cold" >> $GITHUB_ENV
+        if [ "$TEMP" -gt 30 ]; then
+          STATUS="WARNING"
+          STATE="🟡"
+          COLOR="yellow"
+          REASON="High temperature may reduce system efficiency"
+
+        elif [ "$TEMP" -lt 10 ]; then
+          STATUS="CRITICAL"
+          STATE="🔴"
+          COLOR="red"
+          REASON="Low temperature may affect system stability"
+
         else
-          echo "STATUS=HEALTHY" >> $GITHUB_ENV
-          echo "STATE=🟢" >> $GITHUB_ENV
-          echo "REASON=Good weather" >> $GITHUB_ENV
+          STATUS="HEALTHY"
+          STATE="🟢"
+          COLOR="brightgreen"
+          REASON="System operating under optimal conditions"
         fi
 
-    # 5. Load history
-    - name: Load history
+        echo "STATUS=$STATUS" >> $GITHUB_ENV
+        echo "STATE=$STATE" >> $GITHUB_ENV
+        echo "COLOR=$COLOR" >> $GITHUB_ENV
+        echo "REASON=$REASON" >> $GITHUB_ENV
+
+    # 5. Load + update history
+    - name: Update history
       run: |
         if [ -f history.txt ]; then
           HISTORY=$(cat history.txt)
@@ -64,41 +74,45 @@ jobs:
         echo "$NEW_HISTORY" > history.txt
         echo "NEW_HISTORY=$NEW_HISTORY" >> $GITHUB_ENV
 
-    # 6. Trend analysis
+    # 6. Trend
     - name: Analyze trend
       run: |
-        COUNT_GREEN=$(echo "$NEW_HISTORY" | grep -o "🟢" | wc -l)
-        COUNT_RED=$(echo "$NEW_HISTORY" | grep -o "🔴" | wc -l)
+        GREEN=$(echo "$NEW_HISTORY" | grep -o "🟢" | wc -l)
+        RED=$(echo "$NEW_HISTORY" | grep -o "🔴" | wc -l)
 
-        if [ "$COUNT_RED" -gt "$COUNT_GREEN" ]; then
-          TREND="⚠️ System unstable"
+        if [ "$RED" -gt "$GREEN" ]; then
+          TREND="📉 Declining"
         else
-          TREND="✅ System stable"
+          TREND="📈 Stable"
         fi
 
         echo "TREND=$TREND" >> $GITHUB_ENV
 
-    # 7. Generate README Dashboard
+    # 7. Generate UI Dashboard
     - name: Generate README
       run: |
-        echo "# 🚀 Go Auto Engine" > README.md
+        echo "# 🚀 Go Auto Engine Dashboard" > README.md
         echo "" >> README.md
 
-        echo "## 🌐 Real Weather Data" >> README.md
-        echo "- Temperature: ${TEMP}°C" >> README.md
-        echo "- Wind Speed: ${WIND} km/h" >> README.md
+        echo "![Status](https://img.shields.io/badge/status-$STATUS-$COLOR)" >> README.md
+        echo "![Auto](https://img.shields.io/badge/automation-active-blue)" >> README.md
+        echo "" >> README.md
+
+        echo "## 🌐 Live Data" >> README.md
+        echo "- 🌡 Temperature: ${TEMP}°C" >> README.md
+        echo "- 💨 Wind: ${WIND} km/h" >> README.md
         echo "" >> README.md
 
         echo "## 🧠 AI Analysis" >> README.md
-        echo "- Status: $STATUS $STATE" >> README.md
+        echo "- Status: $STATE $STATUS" >> README.md
         echo "- Insight: $REASON" >> README.md
         echo "- Trend: $TREND" >> README.md
-        echo "- Time: $(date)" >> README.md
+        echo "- Updated: $(date)" >> README.md
         echo "" >> README.md
 
-        echo "## 📊 Trend Chart" >> README.md
+        echo "## 📊 System Flow" >> README.md
         echo '```mermaid' >> README.md
-        echo "graph LR" >> README.md
+        echo "flowchart LR" >> README.md
 
         COUNT=1
         for item in $NEW_HISTORY; do
@@ -112,12 +126,16 @@ jobs:
         echo "" >> README.md
         echo "## 📜 History" >> README.md
         echo "$NEW_HISTORY" >> README.md
+        echo "" >> README.md
 
-    # 8. Commit changes
+        echo "---" >> README.md
+        echo "⚡ Powered by GitHub Actions + Open-Meteo API" >> README.md
+
+    # 8. Commit
     - name: Commit & push
       run: |
         git config user.name "auto-engine-bot"
         git config user.email "bot@auto-engine.com"
         git add README.md history.txt
-        git commit -m "auto update dashboard" || echo "no changes"
+        git commit -m "✨ UI dashboard update" || echo "no changes"
         git push
