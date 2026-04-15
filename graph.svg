@@ -1,3 +1,4 @@
-<svg xmlns='http://www.w3.org/2000/svg' width='400' height='100'>
-<text x='20' y='50'>Temp: 13.4</text>
+<svg width='500' height='200' xmlns='http://www.w3.org/2000/svg'>
+<polyline fill='none' stroke='#00ffcc' stroke-width='2' points='
+40,200 80,100 120,90 160,75 200,80 240,133 '/>
 </svg>

@@ -1,5 +1,7 @@
 {
   "temp": 13.4,
-  "wind": 6.8,
-  "status": "OK"
+  "wind": 6.3,
+  "status": "OK",
+  "trend": "Stable",
+  "score": 27
 }
