@@ -113,7 +113,7 @@ jobs:
       - name: Commit
         run: |
           git config user.name "nattapongsindhu"
-          git config user.email "septuplex7@gmail.com"
+          git config user.email "268273891+nattapongsindhu@users.noreply.github.com"
 
           git add temp.csv graph.svg data.json history.txt weather.json
           git diff --cached --quiet && echo "no change, skipping" && exit 0
