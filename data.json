@@ -4,9 +4,9 @@
   "direction": 263.0,
   "is_day": true,
   "status": "WARM",
-  "trend": "Falling",
+  "trend": "Stable",
   "score": 48,
   "anomaly": "",
-  "updated": "2026-04-16T00:18:24Z",
-  "sha256": "037c797364dd0b74"
+  "updated": "2026-04-16T00:22:53Z",
+  "sha256": "9aa706336fde0ed5"
 }
