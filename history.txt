@@ -1,5 +1,4 @@
 timestamp,temp,wind,status,trend,score
-2026-05-06T01:54,17.0,12.3,OK,Falling,40,
 2026-05-06T08:07,12.4,6.5,OK,Falling,28,
 2026-05-06T13:29,11.0,7.8,OK,Stable,25,
 2026-05-06T19:26,22.4,5.7,WARM,Rising,47,ANOMALY
@@ -99,3 +98,4 @@ timestamp,temp,wind,status,trend,score
 2026-05-30T13:02,12.2,7.3,OK,Stable,28,
 2026-05-30T18:59,24.8,7.1,WARM,Rising,53,ANOMALY
 2026-05-31T02:31,18.9,10.4,OK,Falling,43,
+2026-05-31T08:34,15.1,5.2,OK,Falling,32,
